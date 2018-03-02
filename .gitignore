@@ -13,3 +13,4 @@
 *.bbl
 *.out
 data/*
+.ipynb_checkpoints/*
