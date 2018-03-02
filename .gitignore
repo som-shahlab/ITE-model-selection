@@ -1,0 +1,15 @@
+*.aux
+*.log
+*.png
+*.pptx
+*.RData
+*.gz
+*.jpeg
+*.pyc
+*.toc
+*.html
+*.pdf
+*.blg
+*.bbl
+*.out
+data/*

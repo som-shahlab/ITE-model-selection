@@ -1,0 +1,79 @@
+\documentclass{article}
+
+% FOR ARXIV:
+\pdfoutput=1
+
+% if you need to pass options to natbib, use, e.g.:
+% \PassOptionsToPackage{numbers, compress}{natbib}
+% before loading nips_2017
+%
+% to avoid loading the natbib package, add option nonatbib:
+%\usepackage[nonatbib]{nips_2017}
+% to compile a camera-ready version, add the [final] option, e.g.:
+%\usepackage[final,nonatbib]{nips_2017}
+
+% \usepackage{nips_2017}
+\usepackage[numbers]{natbib}
+
+
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality-adjusted-life-yearslity tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+
+\usepackage{bm}
+\usepackage{comment}
+\usepackage{amsmath} 
+\usepackage{subcaption}
+\usepackage{listings} 
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{rotfloat}
+\usepackage{float}
+\usepackage{amsthm}
+\usepackage[linesnumbered, lined, ruled, boxed, commentsnumbered]{algorithm2e}
+\graphicspath{{../figures/}}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+\newcommand\independent{\protect\mathpalette{\protect\independenT}{\perp}}
+\def\independenT#1#2{\mathrel{\rlap{$#1#2$}\mkern2mu{#1#2}}}
+
+\begin{document}
+
+\title{General-purpose model selection for estimating individual treatment effects}
+
+\author{Alejandro Schuler \\
+	aschuler@stanford.edu \\
+       Biomedical Informatics Research\\
+       Stanford University\\
+       Palo Alto, CA, USA 
+          \and
+     Nigam Shah \\
+     nigam@stanford.edu \\
+       Biomedical Informatics Research\\
+       Stanford University\\
+       Palo Alto, CA, USA 
+                 \and
+     Michael Baiocchi \\
+     baiocchi@stanford.edu \\
+       Stanford University\\
+       Palo Alto, CA, USA}
+
+\maketitle
+
+\input{0-abstract}
+
+\input{1-introduction} 
+\input{2-approaches}
+\input{3-theory}
+\input{4-variants}
+\input{5-other-methods}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

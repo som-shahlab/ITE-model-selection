@@ -1,0 +1,144 @@
+\section{Theory}
+\label{theory}
+
+As a reminder, we are examining estimators of the form
+
+\begin{equation}
+\tag{\ref{te-error}}
+\check e = \frac{1}{|\mathcal{V}|}\sum_{i \in \mathcal{V}} l(\hat \tau (x_i), \check \tau_i)
+\end{equation}
+
+where $\mathcal V$ is a test set and $\hat\tau$ is a function estimated from a training set. We are left to choose the estimator $\check\tau_i$ and a loss $l$.
+
+\subsection{Connection between gain, value, and estimated treatment effect estimation error}
+
+It is straightforward to see how the, matching MSE and transformed outcome MSE are special cases of equation \ref{te-error} using squared-error loss and two different estimators for $\check\tau$. Outcome MSE can be framed as an ``incorrect'' case where $\check\tau$ relies on $\hat\tau$ and thus incorporates information from the training set. Here we show that gain is also a special case of equation \ref{te-error} and that maximizing gain is equivalent to maximizing value in expectation.
+
+\begin{theorem}
+\label{gain-value}
+In expectation, a model that maximizes estimated gain also maximizes estimated value.
+\end{theorem}
+
+\begin{proof}
+Note that
+\[
+\begin{array}{rcl}	
+	E[\hat g | X=x] & = & E[Y^{\dagger} \hat d(x) | X=x]  \\
+	& =  & (\mu_1(x)-\mu_0(x))  \hat d(x)  \\
+	E[\hat v | X=x] & = & E[Y | W=\hat d(x), X=x]  \\
+	& = & \mu_0(x)(1-\hat d(x)) + \mu_1(x)\hat d(x)
+\end{array}
+\]
+
+Consider two policies $\hat d_a$ and $\hat d_b$ and their respective estimated values $\hat v_a, \hat v_b$  and gains $\hat g_a, \hat g_b$. The expected difference in value between the two models is 
+
+\[
+\begin{array}{rcl}
+E[\hat v_a - \hat v_b] 
+
+& = & E[E[\hat v_a | X] - E[\hat v_b|X]] \\
+
+&=& E \left[
+	\mu_0(X)(1-\hat d_a(X)) + \mu_1(X)\hat d_a(X) 
+      - \mu_0(X)(1-\hat d_b(X)) -  \mu_1(X)\hat d_b(X)
+\right] \\
+
+&=& E \left[
+	  \hat d_a(X) (\mu_1(X)  - \mu_0(X) ) 
+	- \hat d_b(X) (\mu_1(X)  - \mu_0(X) )
+\right] \\
+
+&=& E \left[
+	  E[\hat g_a | X] ) 
+	- E[\hat g_b | X] )
+\right] \\
+
+&=& E \left[ \hat g_a - \hat g_b \right] \\
+
+\end{array}
+\]
+
+If the estimated value of $\hat d_a$ is larger than than of $\hat d_b$, we expect the relationship between their gains to be the same. Since this relation holds between any two policies $\hat d_a$ and $\hat d_b$, the policy that maximizes gain also maximizes value.
+
+\end{proof}
+
+To our knowledge, this is the first result that demonstrates the link between gain and decision-theoretic value and demonstrates why maximizing gain works in practice. 
+
+It is also interesting that the expected gain of a decision rule is equal to the inner product of that rule with the true treatment effect. Gain is a special case of equation \ref{te-error} where $l(\hat \tau (x_i), \check \tau_i) = -\check \tau_i  I(\hat \tau (x_i) > 0)$ and $\check\tau_i = y_i^{\dagger}$. This reveals a connection between maximizing value and minimizing the error in estimated treatment effect(!). 
+
+\subsection{Consistency and unbiasedness of $\check e$}
+
+\subsubsection{Consistency under squared-error loss}
+
+Here we show for the first time that any unbiased and consistent estimate $\check\tau$ of the treatment effect calculated on the test set can be used for estimation of the generalization error under squared-error loss. 
+
+\begin{lemma}
+If $\check\tau$ is unbiased for $\tau$, then 
+\[
+E\left[\frac{1}{|\mathcal{V}|}\sum_{i \in \mathcal{V}}^{|\mathcal{V}|}  (\hat \tau(X_i) - \check \tau_i)^2\right] = E[(\hat\tau(X) - \tau(X))^2] + E[(\check\tau(X) - \tau(X))^2]
+\]
+\end{lemma}
+
+\begin{proof}
+\begin{equation}
+	E\left[ \frac{1}{|\mathcal{V}|}\sum_{i \in \mathcal{V}}^{|\mathcal{V}|}  (\hat \tau(X_i) - \check \tau_i)^2 \right]  
+	= 
+	E[ (\hat \tau(X) - \tau + \tau  - \check \tau)^2 ] \\
+\label{expected-plug-in-mse}
+\end{equation}
+
+The quantity in the sum can be expressed as
+\[
+E[ (\hat \tau(X) - \tau)^2] + 2E[(\hat \tau(X) - \tau)(\tau - \check\tau)] + E[(\tau - \check\tau)^2]
+\]
+
+Using the law of total expectation, we rewrite the second term as $E[E[(\hat \tau(x_i) - \tau(x_i)(\tau(x_i) - \check\tau_i)|X=x_i]]$. Since $\check\tau_i$ and $\hat\tau(x_i)$ are independent, this factors to $E[E[\hat \tau(x_i) - \tau(x_i)|X=x_i]E[\tau(x_i) - \check\tau_i|X=x_i]]$, which is $0$ because $E[\tau(x_i) - \check\tau_i|X=x_i] = 0$ by unbiasedness. Thus equation \ref{expected-plug-in-mse} becomes
+
+\[
+	E\left[ \frac{1}{|\mathcal{V}|}\sum_{i \in \mathcal{V}}^{|\mathcal{V}|}  (\hat \tau(x_i) - \check \tau_i)^2 \right]  
+	=
+	E[ (\hat \tau(X) - \tau(X))^2] + E[(\tau(X) - \check\tau(X))^2]
+\]
+
+\end{proof}
+
+The expected estimated error when we use $\check\tau$ as an estimate for $\tau$ is the expected error of our model $\hat\tau$ plus the expected error of our plug-in estimate $\check\tau$. Consequently, the estimated error we obtain is likely to be greater than the true generalization error of our model. However, our estimate can still be used to select between treatment effect models since the surplus error $E[(\tau(X) - \check\tau(X))^2]$ does not depend on the model $\hat \tau(X)$. 
+
+\begin{theorem}
+If $\check\tau_i$ is unbiased and consistent for $\tau_i$, then $\underset{m}{\emph{argmin}}\frac{1}{|\mathcal{V}|}\sum_{i \in \mathcal{V}}^{|\mathcal{V}|}  (\hat \tau_m(x_i) - \check \tau_i)^2$ is a consistent estimator of $\underset{m}{\emph{argmin}} \ E[(\hat\tau_m(X) - \tau(X))^2]$.
+\end{theorem}
+
+\begin{proof}
+
+($^*$waves hands$^*$) The value of the estimated error for a model $\hat\tau_m$ is $\check e_m = \frac{1}{|\mathcal{V}|}\sum_{i \in \mathcal{V}}^{|\mathcal{V}|}  (\hat \tau_m(x_i) - \check \tau_i)^2 $. As $n$ goes to infinity, this should converge in probability to its expected value, which is a constant $e_m + d$, where $e_m$ is the true generalization error $E[(\tau(X) - \hat\tau(X))^2]$ and $d=E[(\tau(X) - \check\tau(X))^2]$ is a constant that doesn't depend on the model. We compare two models $\hat\tau_A$ and $\hat\tau_B$ on the basis of their estimated error $\check e_A$ and $\check e_B$. In the limit, $\check e_A > \check e_B \iff  e_A + d >  e_B + d \iff  e_A >  e_B$ ($^*$waves hands$^*$) 
+
+\end{proof}
+
+\subsubsection{Unbiasedness under multiplicative loss}
+
+\begin{theorem}
+For losses of the form $l(\check\tau(x), \hat\tau(x)) = \check\tau(x) f(\hat\tau(x))$, if $E[\check\tau(X)|X] = \tau(x)$, then $E[\check e] = E [  l(\tau, \hat\tau) ]$.
+\end{theorem}
+
+\begin{proof}
+
+\[
+\begin{array}{rcl}
+	E[\check e] & = & E \left[ \dfrac{1}{| \mathcal V |} \sum_{i \in \mathcal V} \check\tau(X) f(\hat\tau(X)) \right] \\
+	& = & E \left[  E[ \check\tau(X) f(\hat\tau(X)) | X] \right] \\
+	& = & E \left[  E[ \check\tau(X)|X] f(\hat\tau(X))] \right] \\
+	& = & E \left[  \tau(X) f(\hat\tau(X))] \right] \\
+	& = & E [  l(\tau, \hat\tau) ]
+\end{array}
+\]
+
+\end{proof}
+
+We can therefore generalize gain, using any unbiased estimator of $\tau$ instead of $y^{\dagger}$. By an argument similar to that of theorem \ref{gain-value}, maximizing any form of generalized gain will maximize value in expectation.
+
+\subsubsection{Implications}
+
+If squared-error loss is used, only consistency in estimating a difference in generalization errors can be guaranteed, even with an unbiased estimator $\check\tau$. In other words, model selection with these approaches is not guaranteed to work (on average) unless the number of individuals in the test set is large.
+
+Our results do guarantee that the estimate of generalization error will be unbiased if $\check\tau$ is unbiased for $\tau$ and a multiplicative loss is used. Unbiasedly maximizing the decision-theoretic value of a treatment policy is justifiable in its own right. It is convenient that minimizing generalization error is equivalent to maximizing decision-theoretic value using $l(\check\tau(x), \hat\tau(x))  = \check\tau I(\hat\tau > 0)$ and any unbiased $\check\tau$.
+

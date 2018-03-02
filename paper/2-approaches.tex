@@ -1,0 +1,112 @@
+\section{Existing Approaches}
+\label{approaches}
+
+\subsection{Outcome MSE}
+
+There are many simple examples where minimizing the mean-squared error of predicted outcomes badly fails to select the model with the most accurate treatment effect \cite{Rolling:2013kz}. Despite this, in the absence of anything better, prediction error has been used to select among treatment effect models. Assuming the treatment effect model is built by regressing the outcomes onto the covariates and treatment to obtain $\hat\mu_0$ and $\hat\mu_1$, we can estimate prediction error with
+
+\begin{equation}
+	\check e = \frac{1}{|\mathcal{V}|} \sum_{i \in \mathcal{V}}^{|\mathcal{V}|}  
+	l(\hat \mu_{w_i} (x_i), y_i) 
+\label{pred-error}
+\end{equation}
+ 
+For individuals in the test set who were treated ($w=1$), we estimate their outcome using the treated model and assess error, and vice-versa for the untreated. At first glance, this does not appear to relate to the quantity in equation \ref{te-error}. However, if the loss is of the form $l(f,y) = g(|f-y|)$ (e.g. quadratic loss), we can expand this expression by subtracting the predicted counterfactual mean outcome $\hat\mu_{1-w_i}(x_i)$ from both arguments of the loss function and multiplying both arguments by $(2w_i -1)$, which is always $1$ or $-1$.
+
+\begin{equation}
+	\check e = \frac{1}{|\mathcal{V}|} \sum_{i \in \mathcal{V}}^{|\mathcal{V}|}  
+	l( \ 
+	\underbrace{(2w_i -1) (\hat\mu_{w_i} (x_i) - \hat\mu_{1-w_i}(x_i))}_{\hat\tau(x_i)}, 
+	\underbrace{(2w_i -1) (y_i - \hat\mu_{1-w_i}(x_i))}_{\check\tau_i}
+	) 
+\label{pred-error-expansion}
+\end{equation}
+
+Now we recognize that the first argument $(2w_i -1) (\hat\mu_{w_i} (x_i) - \hat\mu_{1-w_i}(x_i))$ reduces to $\hat\mu_1 (x_i) - \hat\mu_0(x_i) = \hat\tau(x_i)$, which is the treatment effect estimate from our model. The second argument is the difference between the observed outcome $y_i$ and the counterfactual prediction from our model $\hat\mu_{1-w_i}(x_i)$. We can interpret this difference as an estimate of $\tau(x_i)$. 
+
+Comparing equation \ref{pred-error-expansion} to equation \ref{te-error} shows that if we use outcome prediction error to select among treatment effect models, we are ignoring any error in the prediction of the counterfactual outcomes in the test set. 
+
+Another disadvantage of outcome MSE is that it is not actually general-purpose. It can only be applied to modeling algorithms that give us access to estimated potential outcomes $\mu_w(x_i)$. Methods that target the treatment effect directly sometimes do not provide estimates of the potential outcomes.
+
+\subsection{Matched MSE}
+
+\citet{Rolling:2013kz} propose an estimator $\check \tau_i$ based on matched treated and control individuals in the test set. Briefly, for each individual $i$ in the test set they use Mahalanobis distance matching to identify the most similar individual $\bar{i}$ in the test set with the opposite treatment ($w_i \ne w_{\bar i}$) and compute $\check \tau_i = (2w_i -1)(y_i - y_{\bar i})$ as the plug-in estimate of $\tau(x_i)$. 
+
+They prove under general assumptions and a squared-error loss that a more mathematically tractable version of their algorithm has selection consistency, meaning that it correctly selects the best model as the number of individuals goes to infinity. They conjecture that the practical version of the algorithm retains this property.
+
+The downsides of this approach are that Mahalanobis matching scales relatively poorly and matches become difficult to find in high-dimensional covariate spaces.
+
+\subsection{Transformed outcome MSE}
+
+Here we use the notation $Y^{(w)} = Y|(W=w)$ to denote the potential outcomes and $p(X) = E[W|X=x]$ to denote the propensity score. It has long been known that the transformed outcome 
+
+\begin{equation}
+	\begin{array}{rcl}
+	Y^{\dagger}  & = & Y^{(0)} \frac{W}{p(X)} - Y^{(1)} \frac{1-W}{1-p(X)} \\
+	& = &
+	\begin{cases}
+		-\frac{Y}{1-p(X)} & \text{if} \ W=0 \\
+		\frac{Y}{p(X)} & \text{if} \ W=1\\
+	\end{cases} \\
+	\end{array}
+\end{equation}
+
+is, on expectation under standard assumptions, the treatment effect: $E[Y^{\dagger}|X=x] = \tau(x)$. \citet{Gutierrez:2016tq} leverage this fact and propose an estimator $\check \tau_i = Y^{\dagger}_i$ that they show leads to consistent estimation of the generalization error. In randomized and/or controlled experiments, the propensity score is known. In observational settings, a plug-in estimate of the propensity score may be used.
+
+%\begin{proof}
+%\end{proof}
+
+\subsection{Policy value}
+
+\citet{Kapelner:3baXYEjR} and \cite{Zhao:2017wa} select among treatment effect models by comparing their estimated decision-theoretic \emph{values}. Each model $\hat\tau_m(x)$ has an associated set of decision rules $\hat d_{m}(x,k) = I(\hat\tau_m(x) > k)$ which indicate which individuals should be treated if we wish to treat all individuals with expected benefit greater than $k$. Generally, we let $k=0$ so that all individuals who stand to benefit are treated. For notational convenience we write $\hat d_m(x) = \hat d_{m}(x,0)$. The \emph{value} of a decision rule $\hat d$ is $v = E[Y|W=\hat d(X)]$. In other words, the value is the expected outcome of an individual when all individuals are treated according to the policy $\hat d$. If larger values of the outcome are more desirable (e.g. lifespan, click-through rate, approval ratings), then the policy that maximizes the value is optimal, and vice-versa. Without loss of generality, we will assume that we are interested in maximizing value. The best possible policy, $d(x) = I(\tau(x) > 0)$, is generally unknown because we do not know the true treatment effect $\tau(x)$. 
+
+As before, we assume that estimators $\hat\tau_m$ have been previously estimated on an independent training set and we now dedicate our attention to data in the test set $\mathcal{V}$. Somewhat remarkably, we will see that the value of a treatment effect model can be estimated without separately estimating the conditional treatment effect in the test set.
+
+\citet{Kapelner:3baXYEjR} and \cite{Zhao:2017wa} propose the same test set estimator for the value of a treatment effect model:
+
+\begin{equation}
+\label{value}
+\hat v = \frac{1}{|\mathcal{V}|}\sum_{\mathcal{V}} \frac{y_i I(w_i=\hat d(x_i))}{p_{w_i}(x_i)}
+\end{equation}
+
+where $p_{w_i}(x_i) = P(W=w_i | X=x_i)$. This is the propensity score if $w_i = 1$ and one minus the propensity score if $w_i = 0$.
+
+In the randomized setting where $p_{w_i}(x_i) = 0.5$, we can imagine that two side-by-side experiments were run, one in which treatments were assigned according to the model ($W = \hat d(X)$) and one in which they were assigned according to the opposite recommendation ($W = 1 - \hat d(X)$). The data in the test set are a concatenation of the data from these two experiments. To estimate the value of our model, we average the outcomes of individuals in the first experiment and ignore the data from the second experiment. This is essentially what the estimator in equation \ref{value} is doing. When $p_{w_i}(x_i) \ne 0.5$, we must appropriately weigh the outcomes according to the probability of treatment to accomplish the same goal. \citet{Kapelner:3baXYEjR} give a similar explanation, but omit the role of the propensity score. \citet{Zhao:2017wa} provide a short proof that $\hat v$ is unbiased for the true value $v = E[Y|W = \hat d(X)]$. 
+
+
+\subsection{Gain}
+
+The direct marketing literature has in recent years relied on the concept of \emph{gain} to select treatment effect models (which are usually referred to as ``uplift models''). Gain (sometimes also called \emph{lift}) is defined as follows:
+
+\begin{equation}
+\label{gain-basic}
+	\hat \gamma = \frac{1}{|\mathcal V |} \left(
+		  \frac{\sum_{\mathcal{V}} y_i  \hat d(x_i) w_i}{\sum_{\mathcal{V}}  \hat d(x_i) w_i} - 
+		  \frac{\sum_{\mathcal{V}} y_i  \hat d(x_i) (1-w_i)}{\sum_{\mathcal{V}}  \hat d(x_i)  (1-w_i)} 
+		  \right)
+		  \sum_{\mathcal{V}} \hat d(x_i) 
+\end{equation}
+
+The first term inside the parentheses is the average outcome among \emph{treated} individuals in the test set who were also recommended for treatment by the model. The second term is the average outcome among \emph{untreated} individuals in the test set who were recommended for treatment by the model. The resulting difference is an estimate of the average treatment effect among individuals recommended for treatment by the model. That number is multiplied by the total number of individuals in the test set recommended for treatment by the model. 
+
+This estimator is actually a special case of
+
+\begin{equation}
+\label{gain}
+\begin{array}{rcl}
+	\hat g & =& \dfrac{1}{|\mathcal V |} \sum_{\mathcal{V}} \dfrac{y_i  \hat d(x_i) w_i}{p(x_i)} - \sum_{\mathcal{V}} \dfrac{y_i  \hat d(x_i) (1-w_i)}{1-p(x_i)} \\
+	&=& \dfrac{1}{|\mathcal V |} \sum_{\mathcal{V}} y^{\dagger}_i \hat d(x_i)
+\end{array}
+\end{equation}
+
+Equation \ref{gain-basic} can be rewritten as:
+\[
+	 \dfrac{1}{|\mathcal V |} \underbrace{ \frac{ \sum_{\mathcal{V}} \hat d(x_i)}{\sum_{\mathcal{V}}  \hat d(x_i) w_i} }_{1/\hat p}
+		  	\sum_{\mathcal{V}} y_i  \hat d(x_i) w_i - 
+		\dfrac{1}{|\mathcal V |}  \underbrace{ \frac{ \sum_{\mathcal{V}} \hat d(x_i)}{\sum_{\mathcal{V}}  \hat d(x_i)  (1-w_i)} }_{1/ (1-\hat p)}
+		  	\sum_{\mathcal{V}} y_i  \hat d(x_i) (1-w_i) 
+\]
+
+The multipliers underbraced above are unbiased estimates of $1/\hat p_{w_i}$ because of the conditional independence of $\hat d(X)$ and $W$. 
+
+Thus the traditional formula for gain is a version of our formula that is suitable for use when $p(x) = p$ is a constant, as is the case in randomized experiments. By and large, the direct marketing literature has focused on randomized data - to our knowledge this is the first time a gain estimator has been constructed for observational data. 

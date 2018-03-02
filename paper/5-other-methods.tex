@@ -1,0 +1,107 @@
+\section{Other general-purpose methods}
+
+There are a few treatment effect model selection approaches that we have not examined: the direct marketing literature documents the use of various functions of the ``uplift curve'' \cite{Gutierrez:2016tq}, while \citet{vanKlaveren:2018gg} propose what they call the concordance-for-benefit statistic. 
+
+Recall that the decision policy can be parametrized with a cutoff $k$: $\hat d(x,k) = I(\hat\tau>k)$. We can therefore also calculate the gain at $k$, $\hat g(k)$, which is the gain obtained when individuals with an estimated treatment effect greater than $k$ are treated. Researchers in direct marketing often rely on \emph{uplift curves} (also called gain curves or cumulative gain charts) \ to aid in model selection. The uplift curve plots gain at $k$ against the percentage of individuals in the test set recommended for treatment at $k$. These curves are evaluated either heuristically, using the maximum value over $k$, or, most commonly, using the area under the curve \cite{Gutierrez:2016tq}.
+
+\citet{vanKlaveren:2018gg} propose the concordance-for-benefit statistic to select among treatment effect models. Briefly, each individual $i$ in the test set is matched without replacement according to estimated treatment effect with another individual in the test set $\bar{i}$ ($\hat\tau(x_i) \approx \hat\tau(x_{\bar i})$) with the opposite treatment $w_i \ne w_{\bar i}$. The total number of pairs is $J$. For each pair of matched patients $j$, the difference in outcomes between the treated and untreated individuals is recorded: $\delta_j = (2w_i - 1)(y_i -y_{\bar i})$, along with the predicted treatment effect for both patients $t_j = \hat\tau(x_i)$. The concordance-for-benefit (or c-for-benefit) statistic is
+
+\[
+\hat c = \frac{\sum_j^J \sum_{j' > j}^J (1 - \text{sign}((\delta_{j'} - \delta_j)(t_{j'} - t_j))) }{(J^2-J)}
+\]
+
+This is the proportion of pairs-of-pairs in which the difference in predicted treatment effects is discordant with the difference in ``observed'' treatment effects in the test set. This assesses the overall ranking of individuals with respect to their estimated treatment effects.
+
+Both of these approaches are inspired by different interpretations of the area under the receiver operating characteristic curve statistic (AUC), which is both the area under a parametric curve indexed by a classification cutoff (i.e. $k$) and an estimate of the proportion of pairs expected to have discordant classifications \cite{Hanley:1982cz}. We conjecture that there is a theoretical relationship between these approaches and that they are both related to gain and value. Neither optimizes for a particular decision threshold, which may increase robustness in model selection.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{comment}
+
+Recall that the decision policy can be parametrized with a cutoff $k$: $\hat d(x,k) = I(\hat\tau>k)$. We can therefore also calculate the gain at $k$, $\hat g(k)$, which is the gain obtained when individuals with an estimated treatment effect greater than $k$ are treated. Researchers in direct marketing often rely on \emph{uplift curves} (also called gain curves or cumulative gain charts) \ to aid in model selection. The uplift curve plots gain at $k$:
+
+\[
+	\hat g(k)  =  \sum_{\mathcal{V}} \dfrac{y_i  \hat d(x_i,k) (2w_i-1)}{p_{w_i}(x_i)} 
+\]
+
+
+
+
+Researchers either evaluate these curves heuristically, take the maximum value over $k$, or calculate the \emph{Qini coefficient}, which is the area under the uplift curve \cite{Gutierrez:2016tq}. Given the relationship between gain and value, maximizing these metrics is equivalent to maximizing the equivalent value-based metric. 
+
+\subsubsection{The concordance-for-benefit statistic}
+
+\citet{vanKlaveren:2018gg} propose the concordance-for-benefit statistic to select among treatment effect models. Briefly, each individual $i$ in the test set is matched without replacement according to estimated treatment effect with another individual in the test set $\bar{i}$ ($\hat\tau(x_i) \approx \hat\tau(x_{\bar i})$) with the opposite treatment $w_i \ne w_{\bar i}$. The total number of pairs is $J$. For each pair of matched patients $j$, the difference in outcomes between the treated and untreated individuals is recorded: $\delta_j = (2w_i - 1)(y_i -y_{\bar i})$, along with the predicted treatment effect for both patients $t_j = \hat\tau(x_i)$. The concordance-for-benefit (or c-for-benefit) statistic is
+
+\[
+\hat c = \frac{\sum_j^J \sum_{j' > j}^J (1 - \text{sign}((\delta_{j'} - \delta_j)(t_{j'} - t_j))) }{(J^2-J)}
+\]
+
+This is the proportion of pairs-of-pairs in which the difference in predicted treatment effects is discordant with the difference in ``observed'' treatment effects in the test set. 
+
+At first glance, this resembles the ineffective treatment effect matching approach we describe in section \ref{te-match}. The difference is that the c-for-benefit does not assess the disparity between ``observed'' and estimated treatment effects- it assesses the quality of the ranking according to the estimated treatment effect. The c-for-benefit is an estimate of:
+
+\[
+P(Y_i - Y_{\bar i} > Y_{i'} - Y_{\bar i'} | W_i = W_{i'} = 1, W_{\bar i} = W_{\bar i'} = 1, \hat\tau(X_i) = \hat\tau(X_{\bar i}), \hat\tau(X_{i'}) = \hat\tau(X_{\bar i'}), \hat\tau(X_i) > \hat\tau(X_{i'}))
+\]
+
+The c-for-benefit may be related to value and gain. To see this, we simplify the procedure: instead of matching pairs, we bin individuals into $J$ bins, each with approximately equal treatment effect: $S_j = \{i | l_j \le \hat\tau(x_i) < u_j\}$ where $u_j = l_{j+1}$, $l_1 = \underset{i \in \mathcal{V}}{\text{min}} \ \hat\tau(x_i)$, and $u_J = \underset{i \in \mathcal{V}}{\text{max}} \ \hat\tau(x_i)$. To capture the spirit of the original definition, we let $t_j$ be the average estimated treatment effect in each bin and we calculate 
+
+\[
+\delta_j = \sum_{i \in S_j} \frac{y_i w_i}{p_i} - \sum_{i \in S_j} \frac{y_i (1-w_i)}{(1-p_i)}
+\]
+
+so that $\delta_j$ is an unbiased estimate of the treatment effect among individuals in bin $S_j$. Note that this definition of $\delta_j$ is identical to our definition of the generalized gain $\hat g$ if the policy is $\hat d(x_i) = I(i \in S_j)$. In the case where there are only two bins $S_1 = \{i | \hat\tau(x_i) < 0\}$ and $S_2 = \{i | 0 \le \hat\tau(x_i)\}$, the binned c-for-benefit statistic is
+
+\[
+\hat c^{^{split}} = \frac{1}{2} \left( 1 - \text{sign}((\delta_2 - \delta_1)(t_2 - t_1)) \right)
+\]
+
+By construction, $t_2 - t_1 > 0$. We also have that $\delta_1 = \hat g(1-\hat d(x))$ and $\delta_2 = \hat g(\hat d(x))$, where $\hat d(x) = I(\hat\tau(x) > 0)$. Therefore
+
+\[
+\hat c^{split} = \frac{1}{2} (1 - \text{sign}(\hat g(\hat d) - \hat g(1- \hat d)))
+\]
+
+\begin{theorem} 
+As the size of the test set goes to infinity, the model that maximizes gain (and thus value) is one of the models that minimizes $\hat c^{split}$.
+\end{theorem}
+
+\begin{proof}
+Recall that $E[\hat g(\hat d)] = E[\tau(X) \hat d(X)]$. Now note that
+\[
+\begin{array}{rcl}
+	E[\hat g(1-\hat d)] &=& E[E[\hat g(1-\hat d)|X]] \\
+	&=&  E[\tau(X)(1-\hat d(X))] \\
+	&=&  E[\tau(X) - \tau(X) \hat d(X)] \\
+	&=&  \bar \tau - E[\tau(X) \hat d(X)] \\
+	&=&  \bar \tau - E[\hat g(\hat d)]
+\end{array}
+\]	
+	
+Take two decision rules $\hat d_a$ and $\hat d_b$. 
+\[
+\begin{array}{rcl}
+E[\hat c^{split}_a - \hat c^{split}_b] & = & - E[\text{sign}(\hat g_a - \hat g_{1-a})] + E[\text{sign}(\hat g_b - \hat g_{1-b})] \\
+\end{array}
+\] 
+
+\emph{*waves hands*} In the limit, $\hat g_m - \hat g_{1-m}$ should converge to $2E[\hat g_m] - \bar \tau$, so we have the following cases:
+
+\[
+E[\hat c^{split}_a - \hat c^{split}_b] \rightarrow \left\{
+\begin{array}{rcl}
+2 & \text{if} & E[\hat g_b] > \bar \tau \text{ and } E[\hat g_a] < \bar \tau \\
+0 & \text{if} & E[\hat g_b] > \bar \tau \text{ and } E[\hat g_a] > \bar \tau \\
+0 & \text{if} & E[\hat g_b] < \bar \tau \text{ and } E[\hat g_a] < \bar \tau \\
+-2 & \text{if} & E[\hat g_b] < \bar \tau \text{ and } E[\hat g_a] > \bar \tau \\
+\end{array} \right.
+\] 
+
+Consequently, $E[\hat c^{split}_a] > E[\hat c^{split}_b]$ only if $E[\hat g_a] < E[\hat g_b]$ and $E[\hat c^{split}_a] < E[\hat c^{split}_b]$ only if $E[\hat g_a] > E[\hat g_b]$.
+
+\end{proof}
+
+To illustrate this relationship we have had to simplify the c-for-benefit, which may fundamentally change its nature. The original pair-matching procedure is adaptive, whereas our binned procedure uses an a-priori split.
+
+\end{comment}

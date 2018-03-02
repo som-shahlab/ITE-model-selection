@@ -1,0 +1,18 @@
+\section{Variants}
+\label{variants}
+
+\emph{Mike's IV estimator and friends go here}
+
+\subsection{Matching on estimated treatment effect}
+
+\label{te-match}
+
+Another idea is to match or stratify individuals in the test set by their estimated treatment effect. After doing so, we assess how well the average estimate compares to the difference in test set outcomes within the strata or matched pair \emph{[personal correspondence w/ Rob]}. Regardless of the details, the idea is to construct an estimator $\check\tau(x_i)$ such that 
+
+\[
+E[\check\tau(x_i)] = E[(Y_i - Y_j) | W_i = 1, W_j=0, \hat\tau(X_j) = \hat\tau(x_i)]
+\]
+
+Here one can imagine that individuals $i$ and $j$ are a pair matched on the estimated treatment effect such that $\hat\tau(x_i) = \hat\tau(x_j)$. In the case of a randomized experiment, the right-hand-side of the above becomes $E[ \tau(X_j) | \hat\tau(X_j) = \hat\tau(x_i)]$. Unless $\hat\tau(x) = \tau(x)$, this quantity is not generally consistent or unbiased for $\tau(x_i)$ so we have no reason to believe that using it as $\check \tau(x_i)$ should result in a useful estimator of generalization error. Our simulations confirm this result.
+
+% why we can't use a model for \check \tau (must be unbiased)
