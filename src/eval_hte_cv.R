@@ -16,22 +16,19 @@ find_matches = function(data) {
 }
 
 
-setup_data = function(scenario, training_percent, n_folds) {
-	setup = setup_simulation(scenario) 
-	setup$params$p = 10 # for efficiency
-
-	data = create_data(setup) %>% 
-	    mutate(set = ifelse(subject > n()*training_percent, "test", "training"))
+setup_data = function(DGP, n, training_percent, n_folds) {
+	data = create_data(DGP$mean_fun, DGP$propensity_fun, DGP$effect_fun, DGP$sigma, n) %>% 
+	    mutate(set = ifelse(subject > n*training_percent, "test", "training"))
 	true_effect = data %>% 
 	    select(starts_with("covariate")) %>% 
-	    (setup$functions$effect)
+	    (DGP$effect_fun)
 	true_mean = data %>% 
 	    select(starts_with("covariate")) %>% 
-	    (setup$functions$mean)
+	    (DGP$mean_fun)
 	true_propensity = data %>% 
 	    select(starts_with("covariate")) %>% 
-	    (setup$functions$propensity)
-	# opt_value = true_hte_value(true_effect, true_effect, true_mean)
+	    (DGP$propensity_fun)
+	opt_value = true_hte_value(true_effect, true_effect, true_mean)
 
 	cv_index = data %>% 
 	    filter(set=="training") %>%
@@ -70,37 +67,34 @@ compute_cv_metrics = function(estimates) {
 	estimates  %>%
 	    # dplyr::group_by(!!!syms(c(param_names, "fold"))) %>% # I do this for each fold
 	    dplyr::group_by(model, fold) %>% # I do this for each fold
-	    dplyr::summarize(prediction_accuracy = -mse(est_outcome, outcome),
-	                     transformed_accuracy = -transformed_mse(est_effect, treatment, outcome, weights=ip_weights),
-	                     matching_accuracy = -matching_mse(est_effect, treatment, outcome, subject, match),
+	    # mutate(est_effect_test_match = est_effect_covariate_matching(treatment, outcome, subject, match),
+	    	   # est_effect_test_trans = est_effect_transformed_outcome(treatment, outcome, ip_weights)) %>%
+	    dplyr::summarize(# framework:
+	    				 match_mse = est_effect_covariate_matching(treatment, outcome, subject, match) %>% loss_squared_error(est_effect),
+	    				 trans_mse = est_effect_transformed_outcome(treatment, outcome, ip_weights) %>% loss_squared_error(est_effect), 
+	    				 match_decision = est_effect_covariate_matching(treatment, outcome, subject, match) %>% loss_decision(est_effect),
+	    				 trans_decision = est_effect_transformed_outcome(treatment, outcome, ip_weights) %>% loss_decision(est_effect), # aka gain!
+	    				 # value:
+						 value = -value(est_effect, treatment, outcome, weights=ip_weights),
+						 gain = -gain(est_effect, treatment, outcome, weights=ip_weights),
+						 # broken:
+	    				 prediction_accuracy = loss_squared_error(est_outcome, outcome)
 	                     # uplift = uplift(est_effect, treatment, outcome),
 	                     # decile = decile(est_effect, outcome, treatment),
 	                     # c_benefit = c_benefit(est_effect,treatment,outcome),
-	                     est_gain = gain(est_effect, treatment, outcome, weights=ip_weights),
-	                     est_value = value(est_effect, treatment, outcome, weights=ip_weights),
 	                     # value_max = value_max(est_effect, treatment, outcome, weights=ip_weights),
 	                     # c_benefit_k = c_benefit_k(est_effect, treatment, outcome, weights=ip_weights)
 	                     ) %>%
 	    # dplyr::ungroup() %>% dplyr::group_by(!!!syms(param_names)) %>% # Then average over the folds
-	    dplyr::ungroup() %>% dplyr::group_by(model) %>% # Then average over the folds
-	    dplyr::summarize(prediction_accuracy = mean(prediction_accuracy, na.rm=T),
-	                     est_value = mean(est_value, na.rm=T),
-	                     transformed_accuracy = mean(transformed_accuracy, na.rm=T),
-	                     matching_accuracy = mean(matching_accuracy, na.rm=T),
-	                     # uplift = mean(uplift, na.rm=T),
-	                     est_gain = mean(est_gain, na.rm=T),
-	                     # decile = mean(decile),
-	                     # c_benefit = mean(c_benefit, na.rm=T),
-	                     # value_max = mean(value_max, na.rm=T),
-	                     # c_benefit_k = mean(c_benefit_k, na.rm=T)
-	                     )
+	    dplyr::ungroup() %>% dplyr::select(-fold) %>% dplyr::group_by(model) %>% # Then average over the folds
+	    dplyr::summarize_all(mean, na.rm=T)
 }
 
 compute_test_metrics = function(estimates) {
 	estimates  %>%
 	    dplyr::group_by(model) %>% # there should only be one fold
-	    dplyr::summarize(true_hte_error = mse(est_effect, true_effect),
-	                     true_value = true_hte_value(est_effect, true_effect, true_mean)) 
+	    dplyr::summarize(true_hte_error = loss_squared_error(est_effect, true_effect),
+	                     true_value = -true_value(est_effect, true_effect, true_mean)) 
 }
 
 get_errors = function(cv_estimates, test_estimates) {
@@ -109,7 +103,7 @@ get_errors = function(cv_estimates, test_estimates) {
         gather(selection_method, accuracy, -model)
 	min_cv_accuracy = cv_accuracy %>%
 	    group_by(selection_method) %>%
-	    filter(accuracy == max(accuracy, na.rm=T)) %>%
+	    filter(accuracy == min(accuracy, na.rm=T)) %>%
 	    sample_n(1) %>% # if there are ties for the highest accuracy, break at random
 	    select(-accuracy)
 	test_accuracy = test_estimates %>% 
