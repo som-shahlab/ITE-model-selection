@@ -28,7 +28,7 @@ setup_data = function(DGP, n, training_percent, n_folds) {
 	true_propensity = data %>% 
 	    select(starts_with("covariate")) %>% 
 	    (DGP$propensity_fun)
-	opt_value = true_hte_value(true_effect, true_effect, true_mean)
+	opt_value = true_value(true_effect, true_effect, true_mean)
 
 	cv_index = data %>% 
 	    filter(set=="training") %>%
@@ -52,13 +52,16 @@ setup_data = function(DGP, n, training_percent, n_folds) {
 	return(list(data=data, aux_data=aux_data, cv_index=cv_index, test_index=test_index))
 }
 
-get_estimates = function(data, model, cv_index, test_index, aux_data) {
-	cv_estimates = data %>% 
-	    filter(set=="training") %>%
-	    cross_estimate_hte(model$method, model$tune_grid, cv_index) %>% 
+get_estimates = function(data, models, cv_index, test_index, aux_data) {
+	training_data = data %>% 
+	    filter(set=="training") 
+	cv_estimates = models %>% # cross validate on CV data (ignore the test set)
+		map(~cross_estimate_hte(training_data, .$method, .$tune_grid, cv_index)) %>%
+	    bind_rows() %>%
 	    inner_join(aux_data, by=c("subject", "fold"))
-	test_estimates = data %>% 
-	    cross_estimate_hte(model$method, model$tune_grid, test_index) %>% 
+	test_estimates = models %>% # now train on all CV data and test on the test set
+		map(~cross_estimate_hte(data, .$method, .$tune_grid, test_index)) %>% 
+		bind_rows() %>%
 	    inner_join(aux_data, by=c("subject", "fold"))
 	return(list(cv_estimates=cv_estimates, test_estimates=test_estimates))
 }
@@ -69,16 +72,16 @@ compute_cv_metrics = function(estimates) {
 	    dplyr::group_by(model, fold) %>% # I do this for each fold
 	    # mutate(est_effect_test_match = est_effect_covariate_matching(treatment, outcome, subject, match),
 	    	   # est_effect_test_trans = est_effect_transformed_outcome(treatment, outcome, ip_weights)) %>%
-	    dplyr::summarize(# framework:
+	    dplyr::summarize(#### framework: ###
 	    				 match_mse = est_effect_covariate_matching(treatment, outcome, subject, match) %>% loss_squared_error(est_effect),
 	    				 trans_mse = est_effect_transformed_outcome(treatment, outcome, ip_weights) %>% loss_squared_error(est_effect), 
 	    				 match_decision = est_effect_covariate_matching(treatment, outcome, subject, match) %>% loss_decision(est_effect),
 	    				 trans_decision = est_effect_transformed_outcome(treatment, outcome, ip_weights) %>% loss_decision(est_effect), # aka gain!
 	    				 # value:
 						 value = -value(est_effect, treatment, outcome, weights=ip_weights),
-						 gain = -gain(est_effect, treatment, outcome, weights=ip_weights),
-						 # broken:
-	    				 prediction_accuracy = loss_squared_error(est_outcome, outcome)
+						 # gain = -gain(est_effect, treatment, outcome, weights=ip_weights),
+						 #### broken: ####
+	    				 prediction_error = loss_squared_error(est_outcome, outcome)
 	                     # uplift = uplift(est_effect, treatment, outcome),
 	                     # decile = decile(est_effect, outcome, treatment),
 	                     # c_benefit = c_benefit(est_effect,treatment,outcome),
@@ -98,19 +101,19 @@ compute_test_metrics = function(estimates) {
 }
 
 get_errors = function(cv_estimates, test_estimates) {
-	cv_accuracy = cv_estimates %>% 
+	cv_error = cv_estimates %>% 
     	compute_cv_metrics() %>%
-        gather(selection_method, accuracy, -model)
-	min_cv_accuracy = cv_accuracy %>%
+        gather(selection_method, error, -model)
+	min_cv_error = cv_error %>%
 	    group_by(selection_method) %>%
-	    filter(accuracy == min(accuracy, na.rm=T)) %>%
-	    sample_n(1) %>% # if there are ties for the highest accuracy, break at random
-	    select(-accuracy)
-	test_accuracy = test_estimates %>% 
+	    filter(error == min(error, na.rm=T)) %>%
+	    sample_n(1) %>% # if there are ties for the lowest error, break at random
+	    select(-error)
+	test_error = test_estimates %>% 
 	    compute_test_metrics() 
-	true_selection_accuracy = min_cv_accuracy %>%
-	    inner_join(test_accuracy, by="model") 
+	true_selection_error = min_cv_error %>%
+	    inner_join(test_error, by="model") 
 	    # mutate(optimal_deficiency = -true_hte_value(true_effect, true_effect, true_mean)) # %>%
 	    # mutate(scenario=scenario, n_folds=n_folds, training_percent=training_percent, rep=rep)
-	return(list(cv_accuracy=cv_accuracy, test_accuracy=test_accuracy, true_selection_accuracy=true_selection_accuracy))
+	return(list(cv_error=cv_error, test_error=test_error, true_selection_error=true_selection_error))
 }
