@@ -22,16 +22,16 @@ find_matches = function(data) {
 #' Prepares simulated data for experiments
 #'
 #' @param DGP a list created by a call to dgp()
-#' @param n the number of samples desired
-#' @param training_percent how much data to use for training 
+#' @param n_train number of samples to train and validate on
+#' @param n_test number of samples to test on
 #' @param n_folds the number of folds to use for treatment effect cross-validation
 #' @keywords
 #' @export
 #' @examples
-setup_data = function(DGP, n, training_percent, n_folds) {
-	simulation = create_data(DGP, n) 
+setup_data = function(DGP, n_train, n_test, n_folds) {
+	simulation = create_data(DGP, n_train+n_test) 
 	data = simulation$data %>% 
-	    mutate(set = ifelse(subject > n*training_percent, "test", "training"))
+	    mutate(set = ifelse(subject > n_train, "test", "training"))
 	aux_data = simulation$aux_data
 	# opt_value = true_value(true_effect, true_effect, true_mean)
 
@@ -91,16 +91,16 @@ compute_cv_metrics = function(estimates) {
 	    				 trans_mse = est_effect_transformed_outcome(treatment, outcome, ip_weights) %>% loss_squared_error(est_effect), 
 	    				 match_decision = est_effect_covariate_matching(treatment, outcome, subject, match) %>% loss_decision(est_effect),
 	    				 trans_decision = est_effect_transformed_outcome(treatment, outcome, ip_weights) %>% loss_decision(est_effect), # aka gain!
-	    				 # value:
+	    				 #### value: ####
 						 value = -value(est_effect, treatment, outcome, weights=ip_weights),
-						 # gain = -gain(est_effect, treatment, outcome, weights=ip_weights),
+						 gain = -gain(est_effect, treatment, outcome, weights=ip_weights),
 						 #### broken: ####
-	    				 prediction_error = loss_squared_error(est_outcome, outcome)
-	                     # uplift = uplift(est_effect, treatment, outcome),
-	                     # decile = decile(est_effect, outcome, treatment),
-	                     # c_benefit = c_benefit(est_effect,treatment,outcome),
-	                     # value_max = value_max(est_effect, treatment, outcome, weights=ip_weights),
-	                     # c_benefit_k = c_benefit_k(est_effect, treatment, outcome, weights=ip_weights)
+	    				 prediction_error = loss_squared_error(est_outcome, outcome),
+	                     est_te_strata = est_te_strata(est_effect, outcome, treatment),
+	                     #### : ####
+	                     c_benefit = c_benefit(est_effect, treatment, outcome),
+	                     qini = -qini(est_effect, treatment, outcome),
+	                     value_auc = -value_auc(est_effect, treatment, outcome)
 	                     ) %>%
 	    # dplyr::ungroup() %>% dplyr::group_by(!!!syms(param_names)) %>% # Then average over the folds
 	    dplyr::ungroup() %>% dplyr::select(-fold) %>% dplyr::group_by(model) %>% # Then average over the folds

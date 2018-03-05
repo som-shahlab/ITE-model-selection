@@ -5,54 +5,47 @@
 #' @import caret
 #' @import Matching
 
-create_cv_index = function(data, n_folds=5) {
-		createFolds(data$treatment, k=n_folds) %>% # hold-out indices
-    	map(~(data$subject)[-.]) #  complement of each index, in terms of the subject IDs
-}
+# create_cv_index = function(data, n_folds=5) {
+# 		createFolds(data$treatment, k=n_folds) %>% # hold-out indices
+#     	map(~(data$subject)[-.]) #  complement of each index, in terms of the subject IDs
+# }
 
-# fit_model = setup_fitting("gbm", expand.grid(...))
-# model = fit_model(data)
-setup_fitting_1_model = function(method, tune_grid=NULL, train_index) {
-	function(data) train(
-		  x = data %>% dplyr::select(treatment, starts_with("covariate")) %>% as.matrix,
-		  y = data$outcome,
-		  method = method,
-		  trControl = trainControl(method='cv', 
-                                 number=length(train_index),
-		  						 index=train_index,
-                                 returnResamp="all",
-                                 savePredictions="all"),
-		  tuneGrid = tune_grid)
-}
+# setup_fitting_1_model = function(method, tune_grid=NULL, train_index) {
+# 	function(data) train(
+# 		  x = data %>% dplyr::select(treatment, starts_with("covariate")) %>% as.matrix,
+# 		  y = data$outcome,
+# 		  method = method,
+# 		  trControl = trainControl(method='cv', 
+#                                  number=length(train_index),
+# 		  						 index=train_index,
+#                                  returnResamp="all",
+#                                  savePredictions="all"),
+# 		  tuneGrid = tune_grid)
+# }
 
-test_estimate_hte_1_model = function(data, method, tune_grid, train_index) {
-	fitting_function = setup_fitting_1_model(method, tune_grid, train_index)
-	cf_data = data %>% # must be in this order for the train index to work
-    	mutate(treatment = !treatment)
-	full_data = bind_rows(data, cf_data)
-	models = full_data %>% fitting_function
-	models$pred %>% # this carries with it columns with all the values of the hyperparameters
-		mutate(method = method) %>%
-		# unite(model, -pred, -obs, -rowIndex, -Resample, sep="^") %>%
-		unite_("model", c("method", names(tune_grid)), sep="~") %>%
-		# unite(model, !!!syms(c("method", names(tune_grid))), sep="~") %>%
-	    mutate(cf = ifelse(rowIndex > nrow(data), "counterfactual", "factual")) %>%
-	    mutate(subject = ifelse(cf=="factual", rowIndex, rowIndex-nrow(data))) %>%
-	    select(-rowIndex, -obs) %>%
-	    spread(cf, pred) %>% 
-	    arrange(Resample, subject) %>%
-	    filter(!is.na(factual)) %>%
-	    inner_join(data %>% select(subject, treatment, outcome), by="subject") %>%
-	    mutate(treated=ifelse(treatment, factual, counterfactual),
-	           control=ifelse(treatment, counterfactual, factual),
-	           effect=treated-control)
-}
+# test_estimate_hte_1_model = function(data, method, tune_grid, train_index) {
+# 	fitting_function = setup_fitting_1_model(method, tune_grid, train_index)
+# 	cf_data = data %>% # must be in this order for the train index to work
+#     	mutate(treatment = !treatment)
+# 	full_data = bind_rows(data, cf_data)
+# 	models = full_data %>% fitting_function
+# 	models$pred %>% # this carries with it columns with all the values of the hyperparameters
+# 		mutate(method = method) %>%
+# 		# unite(model, -pred, -obs, -rowIndex, -Resample, sep="^") %>%
+# 		unite_("model", c("method", names(tune_grid)), sep="~") %>%
+# 		# unite(model, !!!syms(c("method", names(tune_grid))), sep="~") %>%
+# 	    mutate(cf = ifelse(rowIndex > nrow(data), "counterfactual", "factual")) %>%
+# 	    mutate(subject = ifelse(cf=="factual", rowIndex, rowIndex-nrow(data))) %>%
+# 	    select(-rowIndex, -obs) %>%
+# 	    spread(cf, pred) %>% 
+# 	    arrange(Resample, subject) %>%
+# 	    filter(!is.na(factual)) %>%
+# 	    inner_join(data %>% select(subject, treatment, outcome), by="subject") %>%
+# 	    mutate(treated=ifelse(treatment, factual, counterfactual),
+# 	           control=ifelse(treatment, counterfactual, factual),
+# 	           effect=treated-control)
+# }
 
-# I'm going to have to hand-code the cross-validation here... i.e. split into train/test: 
-# for each train, fit a bunch models on the treated and control people separately
-# for each test, use (each combination?) of two models on all that data together to generate two columns: 
-# pred treated outcome and pred control outcome. 
-# Also a 3rd column pred outcome that is w*treated_outcome + (1-w)*control_outcome (for outcome CV)
 
 fit_model = function(data, train_index, method, tune_grid) {
 	train(

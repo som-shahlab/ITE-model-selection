@@ -4,14 +4,14 @@
 \alias{setup_data}
 \title{Prepares simulated data for experiments}
 \usage{
-setup_data(DGP, n, training_percent, n_folds)
+setup_data(DGP, n_train, n_test, n_folds)
 }
 \arguments{
 \item{DGP}{a list created by a call to dgp()}
 
-\item{n}{the number of samples desired}
+\item{n_train}{number of samples to train and validate on}
 
-\item{training_percent}{how much data to use for training}
+\item{n_test}{number of samples to test on}
 
 \item{n_folds}{the number of folds to use for treatment effect cross-validation}
 }

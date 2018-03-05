@@ -105,11 +105,11 @@ c_benefit = function(est_effect, treatment, outcome) {
 }
 
 qini = function(est_effect, treatment, outcome, weights=1) {
-	weighted_outcome = weights*outcome
-	data.frame(est_effect, treatment, weighted_outcome) %>%
+	# weighted_outcome = weights*outcome
+	data.frame(est_effect, treatment, outcome) %>%
 		arrange(-est_effect) %>%
-		mutate(Yt = cumsum(weighted_outcome*treatment),
-			   Yc = cumsum(weighted_outcome*(!treatment)),
+		mutate(Yt = cumsum(outcome*treatment),
+			   Yc = cumsum(outcome*(!treatment)),
 			   Nt = cumsum(treatment),
 			   Nc = cumsum(!treatment)) %>%
 		mutate(uplift = (Yt/Nt - Yc/Nc)*(Nt+Nc)/n()) %>%
@@ -118,12 +118,12 @@ qini = function(est_effect, treatment, outcome, weights=1) {
 }
 
 value_auc = function(est_effect, treatment, outcome, weights=1) {
-	weighted_outcome = weights*outcome
-	data.frame(est_effect, treatment, weighted_outcome) %>%
+	# weighted_outcome = weights*outcome
+	data.frame(est_effect, treatment, outcome) %>%
 		arrange(-est_effect) %>%
-		mutate(Yt_lucky = cumsum(weighted_outcome*treatment)) %>%
+		mutate(Yt_lucky = cumsum(outcome*treatment)) %>%
 		arrange(est_effect) %>%
-		mutate(Yc_lucky = cumsum(weighted_outcome*!treatment)) %>%
+		mutate(Yc_lucky = cumsum(outcome*!treatment)) %>%
 		mutate(value = (Yt_lucky + Yc_lucky)/n()) %>%
 		filter(!is.nan(value)) %>%
 		pull(value) %>% 

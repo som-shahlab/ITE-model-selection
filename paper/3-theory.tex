@@ -8,7 +8,7 @@ As a reminder, we are examining estimators of the form
 \check e = \frac{1}{|\mathcal{V}|}\sum_{i \in \mathcal{V}} l(\hat \tau (x_i), \check \tau_i)
 \end{equation}
 
-where $\mathcal V$ is a test set and $\hat\tau$ is a function estimated from a training set. We are left to choose the estimator $\check\tau_i$ and a loss $l$.
+where $\mathcal V$ is a validation set and $\hat\tau$ is a function estimated from a training set. We are left to choose the estimator $\check\tau_i$ and a loss $l$.
 
 \subsection{Connection between gain, value, and estimated treatment effect estimation error}
 
@@ -70,7 +70,7 @@ It is also interesting that the expected gain of a decision rule is equal to the
 
 \subsubsection{Consistency under squared-error loss}
 
-Here we show for the first time that any unbiased and consistent estimate $\check\tau$ of the treatment effect calculated on the test set can be used for estimation of the generalization error under squared-error loss. 
+Here we show for the first time that any unbiased and consistent estimate $\check\tau$ of the treatment effect calculated on the validation set can be used for estimation of the generalization error under squared-error loss. 
 
 \begin{lemma}
 If $\check\tau$ is unbiased for $\tau$, then 
@@ -138,7 +138,7 @@ We can therefore generalize gain, using any unbiased estimator of $\tau$ instead
 
 \subsubsection{Implications}
 
-If squared-error loss is used, only consistency in estimating a difference in generalization errors can be guaranteed, even with an unbiased estimator $\check\tau$. In other words, model selection with these approaches is not guaranteed to work (on average) unless the number of individuals in the test set is large.
+If squared-error loss is used, only consistency in estimating a difference in generalization errors can be guaranteed, even with an unbiased estimator $\check\tau$. In other words, model selection with these approaches is not guaranteed to work (on average) unless the number of individuals in the validation set is large.
 
 Our results do guarantee that the estimate of generalization error will be unbiased if $\check\tau$ is unbiased for $\tau$ and a multiplicative loss is used. Unbiasedly maximizing the decision-theoretic value of a treatment policy is justifiable in its own right. It is convenient that minimizing generalization error is equivalent to maximizing decision-theoretic value using $l(\check\tau(x), \hat\tau(x))  = \check\tau I(\hat\tau > 0)$ and any unbiased $\check\tau$.
 
