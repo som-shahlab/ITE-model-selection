@@ -1,5 +1,9 @@
-library(magrittr)
-library(tidyverse)
+#' @import dplyr
+#' @import purrr
+#' @import tidyr
+#' @import magrittr
+#' @import caret
+#' @import Matching
 
 # group data into all test folds
 # for each test fold, do the internal matching
@@ -15,20 +19,21 @@ find_matches = function(data) {
 			   match = data$subject[c(treated_match$index.control, control_match$index.control)]) # their matches
 }
 
-
+#' Prepares simulated data for experiments
+#'
+#' @param DGP a list created by a call to dgp()
+#' @param n the number of samples desired
+#' @param training_percent how much data to use for training 
+#' @param n_folds the number of folds to use for treatment effect cross-validation
+#' @keywords
+#' @export
+#' @examples
 setup_data = function(DGP, n, training_percent, n_folds) {
-	data = create_data(DGP$mean_fun, DGP$propensity_fun, DGP$effect_fun, DGP$sigma, n) %>% 
+	simulation = create_data(DGP, n) 
+	data = simulation$data %>% 
 	    mutate(set = ifelse(subject > n*training_percent, "test", "training"))
-	true_effect = data %>% 
-	    select(starts_with("covariate")) %>% 
-	    (DGP$effect_fun)
-	true_mean = data %>% 
-	    select(starts_with("covariate")) %>% 
-	    (DGP$mean_fun)
-	true_propensity = data %>% 
-	    select(starts_with("covariate")) %>% 
-	    (DGP$propensity_fun)
-	opt_value = true_value(true_effect, true_effect, true_mean)
+	aux_data = simulation$aux_data
+	# opt_value = true_value(true_effect, true_effect, true_mean)
 
 	cv_index = data %>% 
 	    filter(set=="training") %>%
@@ -44,7 +49,7 @@ setup_data = function(DGP, n, training_percent, n_folds) {
 	    	find_matches()) %>%
 	    bind_rows(.id="fold")
 
-	aux_data = data.frame(subject=data$subject, true_mean=true_mean, true_effect=true_effect, true_propensity=true_propensity) %>%
+	aux_data = aux_data %>%
 		inner_join(matches, by="subject") %>%
 		inner_join(data %>% select(subject, treatment), by='subject') %>%
 		mutate(ip_weights = 1/(1-treatment + 2*treatment*true_propensity - true_propensity)) %>% # evaluates to either 1/p1 (if w=1) or 1/p0 (if w=0)
@@ -52,17 +57,26 @@ setup_data = function(DGP, n, training_percent, n_folds) {
 	return(list(data=data, aux_data=aux_data, cv_index=cv_index, test_index=test_index))
 }
 
-get_estimates = function(data, models, cv_index, test_index, aux_data) {
+#' Estimates conditonal mean regression models on the data via caret. 
+#' Does cross-estimation on the training data and runs each model trained on the full training set on the test set.
+#' Returns all out-of-sample estimates from each model
+#'
+#' @param data  data 
+#' @param models  models 
+#' @param cv_index cv_index
+#' @param test_index  test_index 
+#' @keywords
+#' @export
+#' @examples
+get_estimates = function(data, models, cv_index, test_index) {
 	training_data = data %>% 
 	    filter(set=="training") 
 	cv_estimates = models %>% # cross validate on CV data (ignore the test set)
 		map(~cross_estimate_hte(training_data, .$method, .$tune_grid, cv_index)) %>%
-	    bind_rows() %>%
-	    inner_join(aux_data, by=c("subject", "fold"))
+	    bind_rows() 
 	test_estimates = models %>% # now train on all CV data and test on the test set
 		map(~cross_estimate_hte(data, .$method, .$tune_grid, test_index)) %>% 
-		bind_rows() %>%
-	    inner_join(aux_data, by=c("subject", "fold"))
+		bind_rows() 
 	return(list(cv_estimates=cv_estimates, test_estimates=test_estimates))
 }
 
@@ -100,8 +114,17 @@ compute_test_metrics = function(estimates) {
 	                     true_value = -true_value(est_effect, true_effect, true_mean)) 
 }
 
-get_errors = function(cv_estimates, test_estimates) {
+#' Estimates estimated cv errors and true test errors (the latter via true values in aux_data). 
+#'
+#' @param cv_estimates  cv_estimates 
+#' @param test_estimates test_estimates 
+#' @param aux_data aux_data
+#' @keywords
+#' @export
+#' @examples
+get_errors = function(cv_estimates, test_estimates, aux_data) {
 	cv_error = cv_estimates %>% 
+		inner_join(aux_data, by=c("subject", "fold")) %>%
     	compute_cv_metrics() %>%
         gather(selection_method, error, -model)
 	min_cv_error = cv_error %>%
@@ -110,6 +133,7 @@ get_errors = function(cv_estimates, test_estimates) {
 	    sample_n(1) %>% # if there are ties for the lowest error, break at random
 	    select(-error)
 	test_error = test_estimates %>% 
+		inner_join(aux_data, by=c("subject", "fold")) %>%
 	    compute_test_metrics() 
 	true_selection_error = min_cv_error %>%
 	    inner_join(test_error, by="model") 

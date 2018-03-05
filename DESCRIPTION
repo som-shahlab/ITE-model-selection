@@ -1,0 +1,20 @@
+Package: itecv
+Title: Code to test general purpose model selection for individual treatment effect models
+Version: 0.1
+Authors@R: c(
+    person("Alejandro", "Schuler", role = c("aut", "cre"), email="aschuler@stanford.edu")
+    )
+Maintainer: Alejandro Schuler <aschuler@stanford.edu>
+Description: See Paper
+Depends: 
+    R (>= 3.0.2)
+Imports: 
+    dplyr,
+    tidyr,
+    purrr,
+    magrittr,
+    stringr,
+ 	caret,
+ 	Matching
+VignetteBuilder: knitr
+RoxygenNote: 6.0.1

@@ -1,6 +1,9 @@
-library(Matching)
-library(magrittr)
-library(tidyverse)
+#' @import dplyr
+#' @import purrr
+#' @import tidyr
+#' @import magrittr
+#' @import caret
+#' @import Matching
 
 ####################################################
 ############# FRAMEWORK METHODS ####################

@@ -1,7 +1,9 @@
-library(caret)
-library(magrittr)
-library(tidyverse)
-library(rlang)
+#' @import dplyr
+#' @import purrr
+#' @import tidyr
+#' @import magrittr
+#' @import caret
+#' @import Matching
 
 create_cv_index = function(data, n_folds=5) {
 		createFolds(data$treatment, k=n_folds) %>% # hold-out indices
@@ -52,7 +54,7 @@ test_estimate_hte_1_model = function(data, method, tune_grid, train_index) {
 # pred treated outcome and pred control outcome. 
 # Also a 3rd column pred outcome that is w*treated_outcome + (1-w)*control_outcome (for outcome CV)
 
-fit_model = function(data, train_index, method, tune_grid=NULL) {
+fit_model = function(data, train_index, method, tune_grid) {
 	train(
 		  x = data %>% dplyr::select(starts_with("covariate")) %>% as.matrix,
 		  y = data$outcome,
