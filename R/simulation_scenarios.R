@@ -152,10 +152,9 @@ powers_DGPs = function() {
         scenario_8 = dgp(x1, create_p_rand(), f6, f8, 4)
     )
     biased_DGPs = unbiased_DGPs %>%
-        map(~list(mean_fun=.$mean_fun, 
-                  effect_fun=.$effect_fun, 
-                  propensity_fun=create_p_bias(.$mean_fun, .$effect_fun), 
-                  sigma=.$sigma))
+        map(~dgp(.$covariate_fun, 
+             create_p_bias(.$mean_fun, .$effect_fun), 
+             .$mean_fun, .$effect_fun, .$sigma))
     names(biased_DGPs) = names(unbiased_DGPs) %>% map(~str_c("biased", ., sep="_"))
     c(unbiased_DGPs, biased_DGPs)
 }

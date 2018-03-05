@@ -19,6 +19,11 @@ find_matches = function(data) {
 			   match = data$subject[c(treated_match$index.control, control_match$index.control)]) # their matches
 }
 
+create_cv_index = function(data, n_folds=5) {
+		createFolds(data$treatment, k=n_folds) %>% # hold-out indices
+    	map(~(data$subject)[-.]) #  complement of each index, in terms of the subject IDs
+}
+
 #' Prepares simulated data for experiments
 #'
 #' @param DGP a list created by a call to dgp()

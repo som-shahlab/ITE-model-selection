@@ -5,11 +5,6 @@
 #' @import caret
 #' @import Matching
 
-# create_cv_index = function(data, n_folds=5) {
-# 		createFolds(data$treatment, k=n_folds) %>% # hold-out indices
-#     	map(~(data$subject)[-.]) #  complement of each index, in terms of the subject IDs
-# }
-
 # setup_fitting_1_model = function(method, tune_grid=NULL, train_index) {
 # 	function(data) train(
 # 		  x = data %>% dplyr::select(treatment, starts_with("covariate")) %>% as.matrix,
