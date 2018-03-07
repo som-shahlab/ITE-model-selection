@@ -99,13 +99,15 @@ compute_cv_metrics = function(estimates) {
 	    				 #### value: ####
 						 value = -value(est_effect, treatment, outcome, weights=ip_weights),
 						 gain = -gain(est_effect, treatment, outcome, weights=ip_weights),
-						 #### broken: ####
+						 # #### broken: ####
 	    				 prediction_error = loss_squared_error(est_outcome, outcome),
-	                     est_te_strata = est_te_strata(est_effect, outcome, treatment),
-	                     #### : ####
+	                     est_te_strata = est_te_strata(est_effect, treatment, outcome),
+	                     #### ranking: ####
 	                     c_benefit = c_benefit(est_effect, treatment, outcome),
 	                     qini = -qini(est_effect, treatment, outcome),
-	                     value_auc = -value_auc(est_effect, treatment, outcome)
+	                     value_auc = -value_auc(est_effect, treatment, outcome),
+	                     ### random: ####
+	                     random = random_selector(est_effect)
 	                     ) %>%
 	    # dplyr::ungroup() %>% dplyr::group_by(!!!syms(param_names)) %>% # Then average over the folds
 	    dplyr::ungroup() %>% dplyr::select(-fold) %>% dplyr::group_by(model) %>% # Then average over the folds
@@ -136,12 +138,22 @@ get_errors = function(cv_estimates, test_estimates, aux_data) {
 	    group_by(selection_method) %>%
 	    filter(error == min(error, na.rm=T)) %>%
 	    sample_n(1) %>% # if there are ties for the lowest error, break at random
-	    select(-error)
+	    select(-error) %>% ungroup()
 	test_error = test_estimates %>% 
 		inner_join(aux_data, by=c("subject", "fold")) %>%
-	    compute_test_metrics() 
+	    compute_test_metrics()
+	oracle_error = test_error %>%
+		gather(selection_method, error, -model) %>%
+		group_by(selection_method) %>%
+	    filter(error == min(error, na.rm=T)) %>%
+	    sample_n(1) %>%
+		select(-error) %>% ungroup() %>%
+		mutate(selection_method = str_c("oracle_selector", selection_method, sep="_"))
 	true_selection_error = min_cv_error %>%
-	    inner_join(test_error, by="model") 
+		bind_rows(oracle_error) %>%
+	    inner_join(test_error, by="model") %>%
+	    bind_rows(data.frame(model="truth", selection_method="oracle", true_hte_error=0,  # this is the true model
+	    					 true_value=-true_value(aux_data$true_effect, aux_data$true_effect, aux_data$true_mean)))
 	    # mutate(optimal_deficiency = -true_hte_value(true_effect, true_effect, true_mean)) # %>%
 	    # mutate(scenario=scenario, n_folds=n_folds, training_percent=training_percent, rep=rep)
 	return(list(cv_error=cv_error, test_error=test_error, true_selection_error=true_selection_error))

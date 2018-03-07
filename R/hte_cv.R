@@ -46,9 +46,20 @@ est_te_strata = function(est_effect, treatment, outcome, n_strata=10) {
 				  n_in_strata = n()) %>%
 		dplyr::mutate(te_estimate = mean_treated_outcome - mean_control_outcome,
 			   	  	  error = n_in_strata*(mean_hte_estimate - te_estimate)^2) %>%
-		filter(!is.na(error)) %>%
 		pull(error) %>%
-		mean()
+		mean(na.rm=T)
+}
+
+est_te_match = function(est_effect, treatment, outcome) {
+	match = Match(Tr=treatment, 
+				  X=est_effect,
+				  replace=T, estimand="ATT")
+	delta = outcome[match$index.treated] - outcome[match$index.control]
+	return(loss_squared_error(delta, est_effect))
+}
+
+random_selector = function(est_effect) {
+	return(0)
 }
 
 ### Value Methods ###
