@@ -37,7 +37,8 @@ setup_data = function(DGP, n_train, n_test, n_folds) {
 	simulation = create_data(DGP, n_train+n_test) 
 	data = simulation$data %>% 
 	    mutate(set = ifelse(subject > n_train, "test", "training"))
-	aux_data = simulation$aux_data
+	aux_data = simulation$aux_data %>%
+		mutate(set = ifelse(subject > n_train, "test", "training"))
 	# opt_value = true_value(true_effect, true_effect, true_mean)
 
 	cv_index = data %>% 
@@ -153,7 +154,7 @@ get_errors = function(cv_estimates, test_estimates, aux_data) {
 		bind_rows(oracle_error) %>%
 	    inner_join(test_error, by="model") %>%
 	    bind_rows(data.frame(model="truth", selection_method="oracle", true_hte_error=0,  # this is the true model
-	    					 true_value=-true_value(aux_data$true_effect, aux_data$true_effect, aux_data$true_mean)))
+	    					 true_value=-(aux_data %>% filter(set=="test") %$% true_value(true_effect, true_effect, true_mean))) # this needs to be evaluated just over the test set!!!
 	    # mutate(optimal_deficiency = -true_hte_value(true_effect, true_effect, true_mean)) # %>%
 	    # mutate(scenario=scenario, n_folds=n_folds, training_percent=training_percent, rep=rep)
 	return(list(cv_error=cv_error, test_error=test_error, true_selection_error=true_selection_error))
