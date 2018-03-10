@@ -1,5 +1,7 @@
 \section{Other general-purpose methods}
 
+\label{other}
+
 There are a few treatment effect model selection approaches that we have not examined: the direct marketing literature documents the use of various functions of the ``uplift curve'' \cite{Gutierrez:2016tq}, while \citet{vanKlaveren:2018gg} propose what they call the concordance-for-benefit statistic. 
 
 Recall that the decision policy can be parametrized with a cutoff $k$: $\hat d(x,k) = I(\hat\tau>k)$. We can therefore also calculate the gain at $k$, $\hat g(k)$, which is the gain obtained when individuals with an estimated treatment effect greater than $k$ are treated. Researchers in direct marketing often rely on \emph{uplift curves} (also called gain curves or cumulative gain charts) \ to aid in model selection. The uplift curve plots gain at $k$ against the percentage of individuals in the validation set recommended for treatment at $k$. These curves are evaluated either heuristically, using the maximum value over $k$, or, most commonly, using the area under the curve \cite{Gutierrez:2016tq}.
@@ -12,7 +14,7 @@ Recall that the decision policy can be parametrized with a cutoff $k$: $\hat d(x
 
 This is the proportion of pairs-of-pairs in which the difference in predicted treatment effects is discordant with the difference in ``observed'' treatment effects in the validation set. This assesses the overall ranking of individuals with respect to their estimated treatment effects.
 
-Both of these approaches are inspired by different interpretations of the area under the receiver operating characteristic curve statistic (AUC), which is both the area under a parametric curve indexed by a classification cutoff (i.e. $k$) and an estimate of the proportion of pairs expected to have discordant classifications \cite{Hanley:1982cz}. We conjecture that there is a theoretical relationship between these approaches and that they are both related to gain and value. Neither optimizes for a particular decision threshold, which may increase robustness in model selection.
+Both of these approaches are inspired by different interpretations of the area under the receiver operating characteristic curve statistic (AUC), which is both the area under a parametric curve indexed by a classification cutoff (i.e. $k$) and an estimate of the proportion of pairs expected to have discordant classifications \cite{Hanley:1982cz}. We conjecture that there is a theoretical relationship between these approaches and that they are both related to gain and value. We test both of these methods in simulation, along with value-at-k AUC, which is the same as the Qini coefficient, but using $\hat{v(k)}$ instead of $\hat{g(k)}$.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

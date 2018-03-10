@@ -2,6 +2,7 @@
 \label{approaches}
 
 \subsection{Outcome MSE}
+\label{sec:pred-error}
 
 There are many simple examples where minimizing the mean-squared error of predicted outcomes badly fails to select the model with the most accurate treatment effect \cite{Rolling:2013kz}. Despite this, in the absence of anything better, prediction error has been used to select among treatment effect models. Assuming the treatment effect model is built by regressing the outcomes onto the covariates and treatment to obtain $\hat\mu_0$ and $\hat\mu_1$, we can estimate prediction error with
 
@@ -29,6 +30,7 @@ Comparing equation \ref{pred-error-expansion} to equation \ref{te-error} shows t
 Another disadvantage of outcome MSE is that it is not actually general-purpose. It can only be applied to modeling algorithms that give us access to estimated potential outcomes $\mu_w(x_i)$. Methods that target the treatment effect directly sometimes do not provide estimates of the potential outcomes.
 
 \subsection{Matched MSE}
+\label{match-mse}
 
 \citet{Rolling:2013kz} propose an estimator $\check \tau_i$ based on matched treated and control individuals in the validation set. Briefly, for each individual $i$ in the validation set they use Mahalanobis distance matching to identify the most similar individual $\bar{i}$ in the validation set with the opposite treatment ($w_i \ne w_{\bar i}$) and compute $\check \tau_i = (2w_i -1)(y_i - y_{\bar i})$ as the plug-in estimate of $\tau(x_i)$. 
 
@@ -37,6 +39,7 @@ They prove under general assumptions and a squared-error loss that a more mathem
 The downsides of this approach are that Mahalanobis matching scales relatively poorly and matches become difficult to find in high-dimensional covariate spaces.
 
 \subsection{Transformed outcome MSE}
+\label{trans-mse}
 
 Here we use the notation $Y^{(w)} = Y|(W=w)$ to denote the potential outcomes and $p(X) = E[W|X=x]$ to denote the propensity score. It has long been known that the transformed outcome 
 
@@ -56,9 +59,9 @@ is, on expectation under standard assumptions, the treatment effect: $E[Y^{\dagg
 %\begin{proof}
 %\end{proof}
 
-\subsection{Policy value}
+\subsection{Decision value}
 
-\citet{Kapelner:3baXYEjR} and \cite{Zhao:2017wa} select among treatment effect models by comparing their estimated decision-theoretic \emph{values}. Each model $\hat\tau_m(x)$ has an associated set of decision rules $\hat d_{m}(x,k) = I(\hat\tau_m(x) > k)$ which indicate which individuals should be treated if we wish to treat all individuals with expected benefit greater than $k$. Generally, we let $k=0$ so that all individuals who stand to benefit are treated. For notational convenience we write $\hat d_m(x) = \hat d_{m}(x,0)$. The \emph{value} of a decision rule $\hat d$ is $v = E[Y|W=\hat d(X)]$. In other words, the value is the expected outcome of an individual when all individuals are treated according to the policy $\hat d$. If larger values of the outcome are more desirable (e.g. lifespan, click-through rate, approval ratings), then the policy that maximizes the value is optimal, and vice-versa. Without loss of generality, we will assume that we are interested in maximizing value. The best possible policy, $d(x) = I(\tau(x) > 0)$, is generally unknown because we do not know the true treatment effect $\tau(x)$. 
+\citet{Kapelner:3baXYEjR} and \cite{Zhao:2017wa} select among treatment effect models by comparing their estimated decision-theoretic \emph{values}. Each model $\hat\tau_m(x)$ has an associated set of decision rules $\hat d_{m}(x,k) = I(\hat\tau_m(x) > k)$ which indicate which individuals should be treated if we wish to treat all individuals with expected benefit greater than $k$. Generally, we let $k=0$ so that all individuals who stand to benefit are treated. For notational convenience we write $\hat d_m(x) = \hat d_{m}(x,0)$. The \emph{value} of a decision policy $\hat d$ is $v = E[Y|W=\hat d(X)]$. In other words, the value is the expected outcome of an individual when all individuals are treated according to the policy $\hat d$. If larger values of the outcome are more desirable (e.g. lifespan, click-through rate, approval ratings), then the policy that maximizes the value is optimal, and vice-versa. Without loss of generality, we will assume that we are interested in maximizing value. The best possible policy, $d(x) = I(\tau(x) > 0)$, is generally unknown because we do not know the true treatment effect $\tau(x)$. 
 
 As before, we assume that estimators $\hat\tau_m$ have been previously estimated on an independent training set and we now dedicate our attention to data in the validation set $\mathcal{V}$. Somewhat remarkably, we will see that the value of a treatment effect model can be estimated without separately estimating the conditional treatment effect in the validation set.
 

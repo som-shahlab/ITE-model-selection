@@ -1,0 +1,66 @@
+\section{Simulations}
+
+\subsection{Overview}
+
+We demonstrate the utility of these approaches using simulations. Each simulation is defined by a data-generating process with a known effect function, which allows us to compute true test set errors. Each run of each simulation generates a dataset, which we split into training and test samples. We perform $F$-fold cross validation on the training data, using the various metrics below. I.e. for each training fold, we estimate $M$ different treatment effect functions $\hat\tau_m$ and for each of those we calculate each metric using the data in the corresponding validation fold. The metrics are averaged for each model across all folds. Each metric then selects the model among the $M$ models that minimizes (or maximizes, when appropriate) that metric. The models selected by each metric on the basis of cross-validation are refit on the full training data and applied to the test set. The test-set treatment effect estimates of each model are compared to the known effects to calculate the true cost of using each metric for model selection. Each simulation is repeated multiple times. All of the code used to set up, run, and analyze the simulations is feely available on \href{https://github.com/som-shahlab/ITE-model-selection}{github}.
+
+\subsubsection{Data-generating processes, sampling, and data-splitting}
+
+We use the sixteen simulations from \citet{Powers:2017wd}, each of which we repeat $50$ times. In each repetition, $1000$ samples are used for training and $2000$ are used for testing. We use $2-$, $5-$, and $10-$fold cross validation.
+
+\subsubsection{Models}
+
+We fit several treatment effect models to each simulated dataset. We limit ourselves to two-model conditional mean regressions: given a model specification, we fit two separate models to predict the outcomes of the individuals who were treated and not treated and take the difference in predicted outcomes as the estimated individual treatment effect. This is so that we can calculate outcome prediction MSE as a selection metric for comparison. As a result we do not use any models that directly estimate the individual treatment effect (e.g. causal forests). The models we use are gradient boosted trees (number of trees ranging from $1$ to $500$, tree depth of $3$, shrinkage of $0.2$ and minimum $3$ individuals per node) and elastic nets ($\alpha=0.5$, $\lambda \in [e^{-5}, e^2]$). These models give us a range of high-performing linear and nonlinear models to select among. All models are fit using the `caret` R package.
+
+\subsubsection{Model selection metrics}
+
+The following metrics are used to select among models in each simulation:
+
+\begin{center}
+\begin{tabular}{|m{6cm}|c|c|}
+	\hline
+	 Metric & Reference section & Max or min \\
+	 \hline
+	 Random & NA & Minimize \\
+	 Covariate matched-pairs ITE MSE & \ref{match-mse} & Minimize \\
+	 Transformed outcome ITE MSE & \ref{match-mse} & Minimize \\
+	 Covariate matched-pairs ITE decision cost &  \ref{sec:gain-value} & Minimize \\
+	 Transformed outcome ITE decision cost (neg. generalized gain) &  \ref{gain} & Minimize \\
+	 Traditional gain &  \ref{gain-basic} & Maximize \\ 
+	 Decision value &  \ref{value} & Maximize \\
+	 C-for-benefit &  \ref{other} & Minimize \\
+	 Qini coefficient (gain-at-k AUC) &  \ref{other} & Maximize \\
+	 Value-at-k AUC &  \ref{other} & Maximize \\
+	 Est. treatment effect strata ITE MSE &  \ref{te-match} & Minimize \\
+	 Outcome prediction MSE &  \ref{sec:pred-error} & Minimize \\
+	 \hline
+\end{tabular}
+\end{center}
+
+The ``random'' metric assigns a random number to each model, which means that the model selected by that metric is chosen uniformly at random from the available models. 
+
+\subsubsection{Evaluation metrics}
+
+Let the model $\hat\tau_m$ selected by metric $h$ be written as $\hat\tau^{*_h}$. We calculate the following evaluation metrics over the test set $\mathcal T$:
+
+\begin{equation}
+\label{true-mse}
+\tau MSE^{(\mathcal{T})}_h = \frac{1}{|\mathcal{T}|}\sum_{i \in \mathcal{T}} (\hat\tau^{*_h} (x_i) - \tau(x_i))^2
+\end{equation}
+
+and 
+
+\begin{equation}
+\label{true-value}
+C^{(\mathcal{T})}_h = -\frac{1}{|\mathcal{T}|}\sum_{i \in \mathcal{T}} \mu_{\hat d^{*_h}(x_i)}(x_i)
+\end{equation}
+
+Where $\hat d^{*_h}(x_i) = I(\hat\tau^{*_h}(x_i) > 0)$ as before. 
+
+$\tau MSE_{h}^{(\mathcal{T})}$ calculates how well the selected model estimates the treatment effect for individuals in the test set. $C^{(\mathcal{T})}$ is the ``cost'' (negative value) of applying a decision policy based on the selected model to the individuals in the test set. 
+
+\subsection{Results}
+
+
+
+% table of all selection approaches corresponding to the sections where they are described

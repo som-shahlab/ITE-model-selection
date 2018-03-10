@@ -24,7 +24,14 @@
 \usepackage{amsfonts}       % blackboard math symbols
 \usepackage{nicefrac}       % compact symbols for 1/2, etc.
 \usepackage{microtype}      % microtypography
-
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,      
+    urlcolor=cyan,
+    citecolor=red
+}
 \usepackage{bm}
 \usepackage{comment}
 \usepackage{amsmath} 
@@ -35,6 +42,7 @@
 \usepackage{rotfloat}
 \usepackage{float}
 \usepackage{amsthm}
+\usepackage{array}
 \usepackage[linesnumbered, lined, ruled, boxed, commentsnumbered]{algorithm2e}
 \graphicspath{{../figures/}}
 \newtheorem{theorem}{Theorem}
@@ -44,7 +52,7 @@
 
 \begin{document}
 
-\title{General-purpose model selection for estimating individual treatment effects}
+\title{General-purpose model selection when estimating individual treatment effects}
 
 \author{Alejandro Schuler \\
 	aschuler@stanford.edu \\
@@ -72,6 +80,7 @@
 \input{3-theory}
 \input{4-variants}
 \input{5-other-methods}
+\input{6-simulations}
 
 \bibliographystyle{plainnat}
 \bibliography{references}

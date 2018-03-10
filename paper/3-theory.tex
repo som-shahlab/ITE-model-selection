@@ -11,6 +11,7 @@ As a reminder, we are examining estimators of the form
 where $\mathcal V$ is a validation set and $\hat\tau$ is a function estimated from a training set. We are left to choose the estimator $\check\tau_i$ and a loss $l$.
 
 \subsection{Connection between gain, value, and estimated treatment effect estimation error}
+\label{sec:gain-value}
 
 It is straightforward to see how the, matching MSE and transformed outcome MSE are special cases of equation \ref{te-error} using squared-error loss and two different estimators for $\check\tau$. Outcome MSE can be framed as an ``incorrect'' case where $\check\tau$ relies on $\hat\tau$ and thus incorporates information from the training set. Here we show that gain is also a special case of equation \ref{te-error} and that maximizing gain is equivalent to maximizing value in expectation.
 
@@ -64,7 +65,7 @@ If the estimated value of $\hat d_a$ is larger than than of $\hat d_b$, we expec
 
 To our knowledge, this is the first result that demonstrates the link between gain and decision-theoretic value and demonstrates why maximizing gain works in practice. 
 
-It is also interesting that the expected gain of a decision rule is equal to the inner product of that rule with the true treatment effect. Gain is a special case of equation \ref{te-error} where $l(\hat \tau (x_i), \check \tau_i) = -\check \tau_i  I(\hat \tau (x_i) > 0)$ and $\check\tau_i = y_i^{\dagger}$. This reveals a connection between maximizing value and minimizing the error in estimated treatment effect(!). 
+It is also interesting that the expected gain of a decision rule is equal to the inner product of that rule with the true treatment effect. Gain is a special case of equation \ref{te-error} where $l(\hat \tau (x_i), \check \tau_i) = -\check \tau_i  I(\hat \tau (x_i) > 0)$ and $\check\tau_i = y_i^{\dagger}$. This reveals a connection between maximizing value and minimizing an error in estimated treatment effect(!). It may be possible to use different estimators of $\check\tau_i$ with this loss, e.g. the matching estimator from section \ref{match-mse}.
 
 \subsection{Consistency and unbiasedness of $\check e$}
 
