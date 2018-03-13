@@ -51,8 +51,7 @@ We split the approaches into several categories based on the theoretical motivat
 
 Note that the ``random'' metric assigns a random number to each model, which means that the model selected by that metric is chosen uniformly at random from the available models. 
 
-% If pressed, could a) remove simulations with biased assignment and avoid this altogether or b) incorporate pscore estimation in the simulations 
-In simulations with biased treatment assignment, the true propensity score is made available to methods that require it. An estimated propensity would be used in practice, but our focus here is primarily to illustrate the relationships between different methods.
+In simulations with biased treatment assignment, we calculate metrics that require the propensity score using both the true propensity score and one estimated via logistic regression. The estimated propensity should be used in practice when the true propensity is unknown.
 
 \subsubsection{Evaluation metrics}
 
@@ -128,7 +127,8 @@ Our simulations show that the model methods for which there is theoretical justi
 
 Overall, changing the number of cross-validation folds seems to have little effect, while moving from unbiased to biased treatment assignment tends to negatively impact model selection. 
 
-Random model selection leads to reasonable performance in many simulations because all of the available models perform only somewhat worse than the best among them. This is reflective of real-world use where poor models or hyperparameter combinations are not considered a-priori to save computational time. In other words, random selection is actually a strong baseline in this case.
+Random model selection leads to reasonable performance in many simulations because all of the available models perform only somewhat worse than the best among them. This is reflective of real-world use where poor models or hyperparameter combinations are removed a-priori. 
 
-Among the ITE loss-minimizing approaches, those that employ covariate matching are notably worse off in several simulations, likely due to the difficulty of finding good covariate matches in high dimensions. All of the ``value'' approaches perform nearly identically, as expected, since the metrics they are optimizing have equivalent differences in expectation (theorem \ref{gain-value}). All of the AUC-style methods perform poorly
+Among the ITE loss-minimizing approaches, those that employ covariate matching are notably worse off in several simulations, likely due to the difficulty of finding good covariate matches in high dimensions. All of the ``value'' approaches perform nearly identically, as expected, since the metrics they are optimizing have equivalent differences in expectation (theorem \ref{gain-value}). 
+
 

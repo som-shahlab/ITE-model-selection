@@ -23,7 +23,7 @@ est_effect_transformed_outcome = function(treatment, outcome, weights) {
 	weights*outcome*(2*treatment - 1)
 }
 
-est_effect_strata = function(treatment, outcome, strat_var) {
+est_effect_strata = function(treatment, outcome, strat_var, n_strata=10) {
 	data.frame(strat_var, outcome, treatment) %>%
 		mutate(strata = ntile(strat_var, n_strata)) %>%
 		dplyr::group_by(strata) %>%
@@ -67,10 +67,9 @@ value = function(est_effect, treatment, outcome, cutoff=0, weights=1) {
 	sum(weighted_outcome[do_treat==treatment])/(length(est_effect))
 }
 
-gain = function(est_effect, treatment, outcome, cutoff=0, weights=1) {
+gain = function(est_effect, treatment, outcome, cutoff=0) {
 	do_treat = est_effect >= cutoff
-	weighted_outcome = weights*outcome
-	(mean(weighted_outcome[do_treat & treatment]) - mean(weighted_outcome[do_treat & !treatment]))*sum(do_treat)/length(est_effect)
+	(mean(outcome[do_treat & treatment]) - mean(outcome[do_treat & !treatment]))*sum(do_treat)/length(est_effect)
 }
 
 # c_benefit_k = function(est_effect, treatment, outcome, cutoff=0, weights=1) {

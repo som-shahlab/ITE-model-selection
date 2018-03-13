@@ -106,15 +106,14 @@ compute_cv_metrics = function(estimates) {
 	    				 trans_decision_est_prop = est_effect_transformed_outcome(treatment, outcome, est_ip_weights) %>% loss_decision(est_effect), # aka gain!
 	    				 #### value: ####
 						 value = -value(est_effect, treatment, outcome, weights=true_ip_weights),
-						 gain = -gain(est_effect, treatment, outcome, weights=true_ip_weights),
+						 gain = -gain(est_effect, treatment, outcome),
 						 value_est_prop = -value(est_effect, treatment, outcome, weights=est_ip_weights),
-						 gain_est_prop = -gain(est_effect, treatment, outcome, weights=est_ip_weights),
 						 # #### broken: ####
 	    				 prediction_error = loss_squared_error(est_outcome, outcome),
 	                     est_te_strata = est_effect_transformed_outcome(treatment, outcome, est_effect) %>% loss_squared_error(est_effect),
 	                     #### ranking: ####
 	                     c_benefit = -c_benefit(est_effect, treatment, outcome),
-	                     qini = qini(est_effect, treatment, outcome),
+	                     qini = -qini(est_effect, treatment, outcome),
 	                     value_auc = -value_auc(est_effect, treatment, outcome),
 	                     ### random: ####
 	                     random = random_metric()
