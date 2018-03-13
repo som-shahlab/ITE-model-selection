@@ -1,8 +1,9 @@
 \section{Simulations}
+\label{simulations}
 
 \subsection{Overview}
 
-We demonstrate the utility of these approaches using simulations. Each simulation is defined by a data-generating process with a known effect function, which allows us to compute true test set errors. Each run of each simulation generates a dataset, which we split into training and test samples. We perform $F$-fold cross validation on the training data, using the various metrics below. I.e. for each training fold, we estimate $M$ different treatment effect functions $\hat\tau_m$ and for each of those we calculate each metric using the data in the corresponding validation fold. The metrics are averaged for each model across all folds. Each metric then selects the model among the $M$ models that minimizes (or maximizes, when appropriate) that metric. The models selected by each metric on the basis of cross-validation are refit on the full training data and applied to the test set. The test-set treatment effect estimates of each model are compared to the known effects to calculate the true cost of using each metric for model selection. Each simulation is repeated multiple times. All of the code used to set up, run, and analyze the simulations is feely available on \href{https://github.com/som-shahlab/ITE-model-selection}{github}.
+We demonstrate the utility of these approaches using simulations. Each simulation is defined by a data-generating process with a known effect function, which allows us to compute true test set errors. Each run of each simulation generates a dataset, which we split into training and test samples. We perform $F$-fold cross validation on the training data and compute each model selection metric on each validation fold. I.e. for each training fold, we estimate $M$ different treatment effect functions $\hat\tau_m$ and for each of those we calculate each metric using the data in the corresponding validation fold. The metrics are averaged for each model across all folds. Each model selection approach then selects the model among the $M$ models that minimizes (or maximizes, when appropriate) its corresponding metric. The models selected by each approach on the basis of cross-validation are refit on the full training data and applied to the test set. The test-set treatment effect estimates of each model are compared to the known effects to calculate the true cost of using each approach for model selection. Each simulation is repeated multiple times. All of the code used to set up, run, and analyze the simulations is feely available on \href{https://github.com/som-shahlab/ITE-model-selection}{github}.
 
 \subsubsection{Data-generating processes, sampling, and data-splitting}
 
@@ -10,38 +11,66 @@ We use the sixteen simulations from \citet{Powers:2017wd}, each of which we repe
 
 \subsubsection{Models}
 
-We fit several treatment effect models to each simulated dataset. We limit ourselves to two-model conditional mean regressions: given a model specification, we fit two separate models to predict the outcomes of the individuals who were treated and not treated and take the difference in predicted outcomes as the estimated individual treatment effect. This is so that we can calculate outcome prediction MSE as a selection metric for comparison. As a result we do not use any models that directly estimate the individual treatment effect (e.g. causal forests). The models we use are gradient boosted trees (number of trees ranging from $1$ to $500$, tree depth of $3$, shrinkage of $0.2$ and minimum $3$ individuals per node) and elastic nets ($\alpha=0.5$, $\lambda \in [e^{-5}, e^2]$). These models give us a range of high-performing linear and nonlinear models to select among. All models are fit using the `caret` R package.
+We fit several treatment effect models to each simulated dataset. We limit ourselves to two-model conditional mean regressions: given a model specification, we fit two separate models to predict the outcomes of the individuals who were treated and not treated and take the difference in predicted outcomes as the estimated individual treatment effect. This is so that we can calculate outcome prediction MSE as a selection metric for comparison. As a result we do not use any models that directly estimate the individual treatment effect (e.g. causal forests). The models we use are gradient boosted trees (number of trees ranging from $1$ to $500$, tree depth of $3$, shrinkage of $0.2$ and minimum $3$ individuals per node) and elastic nets ($\alpha=0.5$, $\lambda \in [e^{-5}, e^2]$). These models give us a range of high-performing linear and nonlinear models to select among. For efficiency, we only consider combinations of $\hat\mu_1$ and $\hat\mu_0$ that were fit using the same method with the same hyperparameters. This constraint need not be enforced in practice (i.e. $\hat\mu_0$ could be fit using a linear model and $\hat\mu_1$ fit using a random forest). All models are fit using the caret R package.
 
-\subsubsection{Model selection metrics}
+\subsubsection{Model selection approaches}
 
 The following metrics are used to select among models in each simulation:
 
+% This table is terrible. Need to 1) get Type to be multicolumn 2) fix vertical spacing b/t lines 3) make Ref section much thinner
+
 \begin{center}
-\begin{tabular}{|m{6cm}|c|c|}
+\begin{tabu}{|m{6cm}|c|c|}
 	\hline
-	 Metric & Reference section & Max or min \\
+	 \rowfont[c]{\bfseries} Metric & Reference section & Type \\
 	 \hline
-	 Random & NA & Minimize \\
-	 Covariate matched-pairs ITE MSE & \ref{match-mse} & Minimize \\
-	 Transformed outcome ITE MSE & \ref{match-mse} & Minimize \\
-	 Covariate matched-pairs ITE decision cost &  \ref{sec:gain-value} & Minimize \\
-	 Transformed outcome ITE decision cost (neg. generalized gain) &  \ref{gain} & Minimize \\
-	 Traditional gain &  \ref{gain-basic} & Maximize \\ 
-	 Decision value &  \ref{value} & Maximize \\
-	 C-for-benefit &  \ref{other} & Minimize \\
-	 Qini coefficient (gain-at-k AUC) &  \ref{other} & Maximize \\
-	 Value-at-k AUC &  \ref{other} & Maximize \\
-	 Est. treatment effect strata ITE MSE &  \ref{te-match} & Minimize \\
-	 Outcome prediction MSE &  \ref{sec:pred-error} & Minimize \\
+	 Random & NA &  NA \\
 	 \hline
-\end{tabular}
+	 Covariate matched-pairs ITE MSE & \ref{match-mse} & ITE loss \\
+	 Transformed outcome ITE MSE & \ref{match-mse} & ITE loss \\
+	 Covariate matched-pairs ITE decision cost &  \ref{sec:gain-value} & ITE loss \\
+	 Transformed outcome ITE decision cost (neg. generalized gain) &  \ref{sec:gain}, \ref{sec:gain-value} & ITE loss (Value) \\
+	 \hline
+	 Traditional gain &  \ref{sec:gain} & Value \\ 
+	 Decision value &  \ref{sec:value} & Value \\
+	 \hline
+	 C-for-benefit &  \ref{other} & AUC \\
+	 Qini coefficient (gain-at-k AUC) &  \ref{other} & AUC \\
+	 Value-at-k AUC &  \ref{other} & AUC \\
+	 \hline
+	 Est. treatment effect strata ITE MSE &  \ref{te-match} & Other \\
+	 \hline
+	 Outcome prediction MSE &  \ref{sec:pred-error} & Outcome loss \\
+	 \hline
+\end{tabu}
 \end{center}
 
-The ``random'' metric assigns a random number to each model, which means that the model selected by that metric is chosen uniformly at random from the available models. 
+Taking the model that minimizes (or maximizes, when appropriate) one of these metrics on average across validation folds defines a model selection approach. 
+
+We split the approaches into several categories based on the theoretical motivation for each. The ITE loss approaches all minimize metrics of the form of equation \ref{te-error}. The ``value'' approaches are those that have some theoretical equivalence to maximizing the decision value of a model. The AUC-style approaches are briefly described in section \ref{other}. 
+
+Note that the ``random'' metric assigns a random number to each model, which means that the model selected by that metric is chosen uniformly at random from the available models. 
+
+% If pressed, could a) remove simulations with biased assignment and avoid this altogether or b) incorporate pscore estimation in the simulations 
+In simulations with biased treatment assignment, the true propensity score is made available to methods that require it. An estimated propensity would be used in practice, but our focus here is primarily to illustrate the relationships between different methods.
 
 \subsubsection{Evaluation metrics}
 
-Let the model $\hat\tau_m$ selected by metric $h$ be written as $\hat\tau^{*_h}$. We calculate the following evaluation metrics over the test set $\mathcal T$:
+Let the model $\hat\tau_m$ selected by optimizing metric $h$ in cross-validation be written as $\hat\tau^{*_h}$. 
+
+We are interested in the quantities
+
+\[
+\tau MSE_h = E[ (\hat\tau^{*_h} (X) - \tau(X))^2 ]
+\]
+
+and 
+
+\[
+C_h = -E[ Y| W =\hat d^{*_h} (X)]
+\]
+
+which we unbiasedly estimate in a large test set $\mathcal{T}$ via
 
 \begin{equation}
 \label{true-mse}
@@ -59,8 +88,47 @@ Where $\hat d^{*_h}(x_i) = I(\hat\tau^{*_h}(x_i) > 0)$ as before.
 
 $\tau MSE_{h}^{(\mathcal{T})}$ calculates how well the selected model estimates the treatment effect for individuals in the test set. $C^{(\mathcal{T})}$ is the ``cost'' (negative value) of applying a decision policy based on the selected model to the individuals in the test set. 
 
+We also calculate their minima over all the computed models $\hat\tau_m \in \{\hat\tau_1 \dots \hat\tau_M\}$:
+
+\[
+\tau MSE^{(\mathcal{T})}_{*} = \underset{m}{\text{min}} \ \ \frac{1}{|\mathcal{T}|}\sum_{i \in \mathcal{T}} (\hat\tau_m (x_i) - \tau(x_i))^2
+\]
+
+\[
+C^{(\mathcal{T})}_{*} = \underset{m}{\text{min}} \ \ -\frac{1}{|\mathcal{T}|}\sum_{i \in \mathcal{T}} \mu_{\hat d_m(x_i)}(x_i)
+\]
+
+These quantities represent the best possible performance that any model selection method could acheive given the available models. We also calculate these using the true model $\hat\tau = \tau$, which represents the best achievable performance without specifying any models a-priori:
+
+\[
+\tau MSE^{(\mathcal{T})}_{**} = 0
+\]
+
+\[
+C^{(\mathcal{T})}_{**} = -\frac{1}{|\mathcal{T}|}\sum_{i \in \mathcal{T}} \mu_{ d(x_i)}(x_i)
+\]
+
+We use these minima to calculate the improvements obtained by each model selection approach relative to optimal baselines, which allows for comparison between different simulations. The relative values of $\tau MSE^{(\mathcal{T})}_{h}$ and $C^{(\mathcal{T})}_{h}$ within one test set and one set of models are
+
+\[
+	R\text{-} \tau MSE^{(\mathcal{T})}_{h} = 
+	\frac{\tau MSE^{(\mathcal{T})}_{h} - \tau MSE^{(\mathcal{T})}_{**}}{\tau MSE^{(\mathcal{T})}_{*} - \tau MSE^{(\mathcal{T})}_{**}}
+\]
+
+\[
+	R\text{-}  C^{(\mathcal{T})}_{h} = 
+	\frac{ C^{(\mathcal{T})}_{h} -  C^{(\mathcal{T})}_{**}}{ C^{(\mathcal{T})}_{*} -  C^{(\mathcal{T})}_{**}}
+\]
+
+The closer to zero these are, the better the performance of the model selection method.
+
 \subsection{Results}
 
+Our simulations show that the model methods for which there is theoretical justification do perform better than random selection. 
 
+Overall, changing the number of cross-validation folds seems to have little effect, while moving from unbiased to biased treatment assignment tends to negatively impact model selection. 
 
-% table of all selection approaches corresponding to the sections where they are described
+Random model selection leads to reasonable performance in many simulations because all of the available models perform only somewhat worse than the best among them. This is reflective of real-world use where poor models or hyperparameter combinations are not considered a-priori to save computational time. In other words, random selection is actually a strong baseline in this case.
+
+Among the ITE loss-minimizing approaches, those that employ covariate matching are notably worse off in several simulations, likely due to the difficulty of finding good covariate matches in high dimensions. All of the ``value'' approaches perform nearly identically, as expected, since the metrics they are optimizing have equivalent differences in expectation (theorem \ref{gain-value}). All of the AUC-style methods perform poorly
+

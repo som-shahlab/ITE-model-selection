@@ -1,7 +1,7 @@
 \section{Theory}
 \label{theory}
 
-As a reminder, we are examining estimators of the form
+As a reminder, we are examining several estimators of the form
 
 \begin{equation}
 \tag{\ref{te-error}}
@@ -13,7 +13,7 @@ where $\mathcal V$ is a validation set and $\hat\tau$ is a function estimated fr
 \subsection{Connection between gain, value, and estimated treatment effect estimation error}
 \label{sec:gain-value}
 
-It is straightforward to see how the, matching MSE and transformed outcome MSE are special cases of equation \ref{te-error} using squared-error loss and two different estimators for $\check\tau$. Outcome MSE can be framed as an ``incorrect'' case where $\check\tau$ relies on $\hat\tau$ and thus incorporates information from the training set. Here we show that gain is also a special case of equation \ref{te-error} and that maximizing gain is equivalent to maximizing value in expectation.
+It is straightforward to see how the matching MSE and transformed outcome MSE are special cases of equation \ref{te-error} using squared-error loss and two different estimators for $\check\tau$. Outcome MSE can be framed as an ``incorrect'' case where $\check\tau$ relies on $\hat\tau$ and thus incorporates information from the training set. Here we show that gain is also a special case of equation \ref{te-error} and that maximizing gain is equivalent to maximizing value in expectation.
 
 \begin{theorem}
 \label{gain-value}

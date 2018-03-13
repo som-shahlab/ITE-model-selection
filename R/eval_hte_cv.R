@@ -41,6 +41,10 @@ setup_data = function(DGP, n_train, n_test, n_folds) {
 		mutate(set = ifelse(subject > n_train, "test", "training"))
 	# opt_value = true_value(true_effect, true_effect, true_mean)
 
+	aux_data$est_propensity = glm.fit(x = data %>% select(starts_with("covariate")) %>% as.matrix,
+           							  y = data %>% pull("treatment"),
+           					 		  family = binomial(link="logit")) %$% fitted.values
+
 	cv_index = data %>% 
 	    filter(set=="training") %>%
 	    create_cv_index(n_folds=n_folds)
@@ -58,7 +62,8 @@ setup_data = function(DGP, n_train, n_test, n_folds) {
 	aux_data = aux_data %>%
 		inner_join(matches, by="subject") %>%
 		inner_join(data %>% select(subject, treatment), by='subject') %>%
-		mutate(ip_weights = 1/(1-treatment + 2*treatment*true_propensity - true_propensity)) %>% # evaluates to either 1/p1 (if w=1) or 1/p0 (if w=0)
+		mutate(true_ip_weights = 1/(1-treatment + 2*treatment*true_propensity - true_propensity)) %>% # evaluates to either 1/p1 (if w=1) or 1/p0 (if w=0)
+		mutate(est_ip_weights = 1/(1-treatment + 2*treatment*est_propensity - est_propensity)) %>% # evaluates to either 1/p1 (if w=1) or 1/p0 (if w=0)
 		select(-treatment)
 	return(list(data=data, aux_data=aux_data, cv_index=cv_index, test_index=test_index))
 }
@@ -94,24 +99,27 @@ compute_cv_metrics = function(estimates) {
 	    	   # est_effect_test_trans = est_effect_transformed_outcome(treatment, outcome, ip_weights)) %>%
 	    dplyr::summarize(#### framework: ###
 	    				 match_mse = est_effect_covariate_matching(treatment, outcome, subject, match) %>% loss_squared_error(est_effect),
-	    				 trans_mse = est_effect_transformed_outcome(treatment, outcome, ip_weights) %>% loss_squared_error(est_effect), 
+	    				 trans_mse = est_effect_transformed_outcome(treatment, outcome, true_ip_weights) %>% loss_squared_error(est_effect), 
+						 trans_mse_est_prop = est_effect_transformed_outcome(treatment, outcome, est_ip_weights) %>% loss_squared_error(est_effect), 
 	    				 match_decision = est_effect_covariate_matching(treatment, outcome, subject, match) %>% loss_decision(est_effect),
-	    				 trans_decision = est_effect_transformed_outcome(treatment, outcome, ip_weights) %>% loss_decision(est_effect), # aka gain!
+	    				 trans_decision = est_effect_transformed_outcome(treatment, outcome, true_ip_weights) %>% loss_decision(est_effect), # aka gain!
+	    				 trans_decision_est_prop = est_effect_transformed_outcome(treatment, outcome, est_ip_weights) %>% loss_decision(est_effect), # aka gain!
 	    				 #### value: ####
-						 value = -value(est_effect, treatment, outcome, weights=ip_weights),
-						 gain = -gain(est_effect, treatment, outcome, weights=ip_weights),
+						 value = -value(est_effect, treatment, outcome, weights=true_ip_weights),
+						 gain = -gain(est_effect, treatment, outcome, weights=true_ip_weights),
+						 value_est_prop = -value(est_effect, treatment, outcome, weights=est_ip_weights),
+						 gain_est_prop = -gain(est_effect, treatment, outcome, weights=est_ip_weights),
 						 # #### broken: ####
 	    				 prediction_error = loss_squared_error(est_outcome, outcome),
-	                     est_te_strata = est_te_strata(est_effect, treatment, outcome),
+	                     est_te_strata = est_effect_transformed_outcome(treatment, outcome, est_effect) %>% loss_squared_error(est_effect),
 	                     #### ranking: ####
-	                     c_benefit = c_benefit(est_effect, treatment, outcome),
-	                     qini = -qini(est_effect, treatment, outcome),
+	                     c_benefit = -c_benefit(est_effect, treatment, outcome),
+	                     qini = qini(est_effect, treatment, outcome),
 	                     value_auc = -value_auc(est_effect, treatment, outcome),
 	                     ### random: ####
-	                     random = random_selector(est_effect)
+	                     random = random_metric()
 	                     ) %>%
-	    # dplyr::ungroup() %>% dplyr::group_by(!!!syms(param_names)) %>% # Then average over the folds
-	    dplyr::ungroup() %>% dplyr::select(-fold) %>% dplyr::group_by(model) %>% # Then average over the folds
+	   	dplyr::ungroup() %>% dplyr::select(-fold) %>% dplyr::group_by(model) %>% # Then average over the folds
 	    dplyr::summarize_all(mean, na.rm=T)
 }
 

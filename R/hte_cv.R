@@ -9,7 +9,8 @@
 ############# FRAMEWORK METHODS ####################
 ####################################################
 
-### Estimators for \check\tau
+### Estimators for check tau
+
 est_effect_covariate_matching = function(treatment, outcome, subject, match) {
 	data.frame(subject=subject, match=match, treatment=treatment, 
 			   subject_outcome=outcome) %>%
@@ -22,7 +23,16 @@ est_effect_transformed_outcome = function(treatment, outcome, weights) {
 	weights*outcome*(2*treatment - 1)
 }
 
-### Loss functions
+est_effect_strata = function(treatment, outcome, strat_var) {
+	data.frame(strat_var, outcome, treatment) %>%
+		mutate(strata = ntile(strat_var, n_strata)) %>%
+		dplyr::group_by(strata) %>%
+		dplyr::mutate(mean_treated_outcome = sum(outcome*treatment)/sum(treatment),
+				  mean_control_outcome = sum(outcome*!treatment)/sum(!treatment)) %>%
+		dplyr::mutate(te_estimate = mean_treated_outcome - mean_control_outcome) %>%
+		pull(te_estimate)
+}
+
 loss_squared_error = function(truth, estimate) {
 	mean((estimate-truth)^2)
 }
@@ -35,20 +45,6 @@ loss_decision = function(truth, estimate, cutoff=0) {
 ############# NON-FRAMEWORK METHODS #################
 #####################################################
 
-# Rob's broken method
-est_te_strata = function(est_effect, treatment, outcome, n_strata=10) {
-	data.frame(est_effect, outcome, treatment) %>%
-		mutate(strata = ntile(est_effect, n_strata)) %>%
-		dplyr::group_by(strata) %>%
-		dplyr::summarize(mean_hte_estimate = mean(est_effect),
-				  mean_treated_outcome = sum(outcome*treatment)/sum(treatment),
-				  mean_control_outcome = sum(outcome*!treatment)/sum(!treatment),
-				  n_in_strata = n()) %>%
-		dplyr::mutate(te_estimate = mean_treated_outcome - mean_control_outcome,
-			   	  	  error = n_in_strata*(mean_hte_estimate - te_estimate)^2) %>%
-		pull(error) %>%
-		mean(na.rm=T)
-}
 
 est_te_match = function(est_effect, treatment, outcome) {
 	match = Match(Tr=treatment, 
@@ -58,11 +54,8 @@ est_te_match = function(est_effect, treatment, outcome) {
 	return(loss_squared_error(delta, est_effect))
 }
 
-random_selector = function(est_effect) {
-	return(0)
-}
-
 ### Value Methods ###
+
 true_value = function(est_effect, true_effect, true_mean, cutoff=0) {
 	do_treat = est_effect >= cutoff
 	mean(true_mean + true_effect*(2*do_treat - 1) / 2)
@@ -140,3 +133,5 @@ value_auc = function(est_effect, treatment, outcome, weights=1) {
 		pull(value) %>% 
 		sum()
 }
+
+random_metric = function(){ return(0)}
