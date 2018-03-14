@@ -108,7 +108,7 @@ c_benefit = function(est_effect, treatment, outcome) {
 }
 
 qini = function(est_effect, treatment, outcome, weights=1) {
-	# weighted_outcome = weights*outcome
+	weighted_outcome = weights*outcome
 	data.frame(est_effect, treatment, outcome) %>%
 		arrange(-est_effect) %>%
 		mutate(Yt = cumsum(outcome*treatment),
@@ -121,7 +121,7 @@ qini = function(est_effect, treatment, outcome, weights=1) {
 }
 
 value_auc = function(est_effect, treatment, outcome, weights=1) {
-	# weighted_outcome = weights*outcome
+	weighted_outcome = weights*outcome
 	data.frame(est_effect, treatment, outcome) %>%
 		arrange(-est_effect) %>%
 		mutate(Yt_lucky = cumsum(outcome*treatment)) %>%

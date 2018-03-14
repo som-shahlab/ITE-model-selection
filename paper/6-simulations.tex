@@ -28,7 +28,7 @@ The following metrics are used to select among models in each simulation:
 	 \hline
 	 Covariate matched-pairs ITE MSE & \ref{match-mse} & ITE loss \\
 	 Transformed outcome ITE MSE & \ref{match-mse} & ITE loss \\
-	 Covariate matched-pairs ITE decision cost &  \ref{sec:gain-value} & ITE loss \\
+	 Covariate matched-pairs ITE decision cost &  \ref{sec:gain-value} & ITE loss (Value) \\
 	 Transformed outcome ITE decision cost (neg. generalized gain) &  \ref{sec:gain}, \ref{sec:gain-value} & ITE loss (Value) \\
 	 \hline
 	 Traditional gain &  \ref{sec:gain} & Value \\ 
@@ -51,7 +51,7 @@ We split the approaches into several categories based on the theoretical motivat
 
 Note that the ``random'' metric assigns a random number to each model, which means that the model selected by that metric is chosen uniformly at random from the available models. 
 
-In simulations with biased treatment assignment, we calculate metrics that require the propensity score using both the true propensity score and one estimated via logistic regression. The estimated propensity should be used in practice when the true propensity is unknown.
+In simulations with biased treatment assignment, we estimate a propensity score with logistic regression. That estimated propensity is used in place of the true value in calculating all metrics that require a propensity score.
 
 \subsubsection{Evaluation metrics}
 
@@ -66,7 +66,7 @@ We are interested in the quantities
 and 
 
 \[
-C_h = -E[ Y| W =\hat d^{*_h} (X)]
+v_h = E[ Y| W =\hat d^{*_h} (X)]
 \]
 
 which we unbiasedly estimate in a large test set $\mathcal{T}$ via
@@ -80,12 +80,14 @@ and
 
 \begin{equation}
 \label{true-value}
-C^{(\mathcal{T})}_h = -\frac{1}{|\mathcal{T}|}\sum_{i \in \mathcal{T}} \mu_{\hat d^{*_h}(x_i)}(x_i)
+v^{(\mathcal{T})}_h = \frac{1}{|\mathcal{T}|}\sum_{i \in \mathcal{T}} \mu_{\hat d^{*_h}(x_i)}(x_i)
 \end{equation}
 
 Where $\hat d^{*_h}(x_i) = I(\hat\tau^{*_h}(x_i) > 0)$ as before. 
 
-$\tau MSE_{h}^{(\mathcal{T})}$ calculates how well the selected model estimates the treatment effect for individuals in the test set. $C^{(\mathcal{T})}$ is the ``cost'' (negative value) of applying a decision policy based on the selected model to the individuals in the test set. 
+$\tau MSE_{h}^{(\mathcal{T})}$ calculates how well the selected model estimates the treatment effect for individuals in the test set. $C^{(\mathcal{T})}$ is the decision value of applying the treatment policy $\hat d(x)$ derived from each selected model $\hat \tau (x)$ to the individuals in the test set.
+
+These are both useful metrics, although only the first ($\tau MSE$, sometimes called ``precision in estimating heteorgenous effects'', or PEHE) has typically been used in simulation studies. To see why the test set decision value is also important, consider two models ($A$ and $B$) that estimate the same treatment effect for all individuals except for two ($i=1$ and $i=2$). Let $\tau(x_1) = \tau(x_2) = 0.1$ (i.e. both individuals would benefit from the treatment). Model $A$ estimates $\hat\tau_A(x_1) = -0.1$ and $\hat\tau_A(x_2) = 0.1$. In other words, it incorrectly suggests not treating individual $1$, although the absolute difference $|\hat\tau_A(x_1)-\tau(x_1)| = 0.2$ is quite small, so model $A$ is not heavily penalized by $\tau MSE$. Model $B$ estimates $\hat\tau_B(x_1) = 0.1$ and $\hat\tau_B(x_2) = 100$. Model $B$ correctly suggests the treatment for both individuals, but the absolute difference $|\hat\tau_B(x_2)-\tau(x_2)| = 99.9$ is large and is heavily penalized by $\tau MSE$. What we want is a model that correctly assigns treatment to the individuals who stand to benefit from it. Using $\tau MSE$ in this case would favor model $A$ even though it leads to the mistreatment of more individuals than model $B$ does. However, $\tau MSE$ is still a useful metric. There may be cases where a researcher is interested in the precise magnitude of the effect for each individual, perhaps so that she can allocate scarce resources most effectively.
 
 We also calculate their minima over all the computed models $\hat\tau_m \in \{\hat\tau_1 \dots \hat\tau_M\}$:
 
@@ -94,7 +96,7 @@ We also calculate their minima over all the computed models $\hat\tau_m \in \{\h
 \]
 
 \[
-C^{(\mathcal{T})}_{*} = \underset{m}{\text{min}} \ \ -\frac{1}{|\mathcal{T}|}\sum_{i \in \mathcal{T}} \mu_{\hat d_m(x_i)}(x_i)
+v^{(\mathcal{T})}_{*} = \underset{m}{\text{max}} \ \ \frac{1}{|\mathcal{T}|}\sum_{i \in \mathcal{T}} \mu_{\hat d_m(x_i)}(x_i)
 \]
 
 These quantities represent the best possible performance that any model selection method could acheive given the available models. We also calculate these using the true model $\hat\tau = \tau$, which represents the best achievable performance without specifying any models a-priori:
@@ -104,7 +106,7 @@ These quantities represent the best possible performance that any model selectio
 \]
 
 \[
-C^{(\mathcal{T})}_{**} = -\frac{1}{|\mathcal{T}|}\sum_{i \in \mathcal{T}} \mu_{ d(x_i)}(x_i)
+v^{(\mathcal{T})}_{**} = \frac{1}{|\mathcal{T}|}\sum_{i \in \mathcal{T}} \mu_{ d(x_i)}(x_i)
 \]
 
 We use these minima to calculate the improvements obtained by each model selection approach relative to optimal baselines, which allows for comparison between different simulations. The relative values of $\tau MSE^{(\mathcal{T})}_{h}$ and $C^{(\mathcal{T})}_{h}$ within one test set and one set of models are
@@ -115,20 +117,19 @@ We use these minima to calculate the improvements obtained by each model selecti
 \]
 
 \[
-	R\text{-}  C^{(\mathcal{T})}_{h} = 
-	\frac{ C^{(\mathcal{T})}_{h} -  C^{(\mathcal{T})}_{**}}{ C^{(\mathcal{T})}_{*} -  C^{(\mathcal{T})}_{**}}
+	R\text{-}  v^{(\mathcal{T})}_{h} = 
+	\frac{ v^{(\mathcal{T})}_{h} -  v^{(\mathcal{T})}_{**}}{ v^{(\mathcal{T})}_{*} -  v^{(\mathcal{T})}_{**}}
 \]
 
 The closer to zero these are, the better the performance of the model selection method.
 
 \subsection{Results}
 
-Our simulations show that the model methods for which there is theoretical justification do perform better than random selection. 
-
-Overall, changing the number of cross-validation folds seems to have little effect, while moving from unbiased to biased treatment assignment tends to negatively impact model selection. 
+Changing the number of cross-validation folds seems to have little effect, while moving from unbiased to biased treatment assignment tends to negatively impact the performance of the selected model regardless of the selection approach. 
 
 Random model selection leads to reasonable performance in many simulations because all of the available models perform only somewhat worse than the best among them. This is reflective of real-world use where poor models or hyperparameter combinations are removed a-priori. 
 
-Among the ITE loss-minimizing approaches, those that employ covariate matching are notably worse off in several simulations, likely due to the difficulty of finding good covariate matches in high dimensions. All of the ``value'' approaches perform nearly identically, as expected, since the metrics they are optimizing have equivalent differences in expectation (theorem \ref{gain-value}). 
+ITE loss-minimizing approaches perform well, but those that employ covariate matching are notably worse off in several simulations, likely due to the difficulty of finding good covariate matches in high dimensions. All of the approaches related to value estimation perform similarly, as expected, since the metrics they are optimizing have equivalent differences in expectation (theorem \ref{gain-value}). In some simulations with biased assignment, the traditional formulation of gain does poorly where our generalized version succeeds, presumably because our formulation correctly incorporates the propensity score. Of the AUC-style approaches, the Qini coefficient performs poorly, C-for-benefit performs reasonably, and our proposed value-at-k AUC does well. Stratifying on the predicted treatment effect as described in section \ref{te-match} fares poorly, as predicted. A straightforward application of outcome prediction MSE does very well.
+
 
 
