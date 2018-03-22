@@ -3,11 +3,11 @@
 
 \subsection{Overview}
 
-We demonstrate the utility of these approaches using simulations. Each simulation is defined by a data-generating process with a known effect function, which allows us to compute true test set errors. Each run of each simulation generates a dataset, which we split into training and test samples. We perform $F$-fold cross validation on the training data and compute each model selection metric on each validation fold. I.e. for each training fold, we estimate $M$ different treatment effect functions $\hat\tau_m$ and for each of those we calculate each metric using the data in the corresponding validation fold. The metrics are averaged for each model across all folds. Each model selection approach then selects the model among the $M$ models that minimizes (or maximizes, when appropriate) its corresponding metric. The models selected by each approach on the basis of cross-validation are refit on the full training data and applied to the test set. The test-set treatment effect estimates of each model are compared to the known effects to calculate the true cost of using each approach for model selection. Each simulation is repeated multiple times. All of the code used to set up, run, and analyze the simulations is feely available on \href{https://github.com/som-shahlab/ITE-model-selection}{github}.
+We demonstrate the utility of these approaches using simulations. Each simulation is defined by a data-generating process with a known effect function, which allows us to compute true test set errors. Each run of each simulation generates a dataset, which we split into training and test samples. We perform $5$-fold cross validation on the training data and compute each model selection metric on each validation fold. I.e. for each training fold, we estimate $M$ different treatment effect functions $\hat\tau_m$ and for each of those we calculate each metric using the data in the corresponding validation fold. The metrics are averaged for each model across all folds. Each model selection approach then selects the model among the $M$ models that minimizes (or maximizes, when appropriate) its corresponding metric. The models selected by each approach on the basis of cross-validation are refit on the full training data and applied to the test set. The test-set treatment effect estimates of each model are compared to the known effects to calculate the true cost of using each approach for model selection. Each simulation is repeated multiple times. All of the code used to set up, run, and analyze the simulations is feely available on \href{https://github.com/som-shahlab/ITE-model-selection}{github}.
 
-\subsubsection{Data-generating processes, sampling, and data-splitting}
+\subsubsection{Data-generating processes and sampling}
 
-We use the sixteen simulations from \citet{Powers:2017wd}, each of which we repeat $50$ times. In each repetition, $1000$ samples are used for training and $2000$ are used for testing. We use $2-$, $5-$, and $10-$fold cross validation.
+We use the sixteen simulations from \citet{Powers:2017wd}, each of which we repeat $50$ times. In each repetition, $1000$ samples are used for training and validation and $2000$ are used for testing. 
 
 \subsubsection{Models}
 
@@ -85,11 +85,11 @@ v^{(\mathcal{T})}_h = \frac{1}{|\mathcal{T}|}\sum_{i \in \mathcal{T}} \mu_{\hat 
 
 Where $\hat d^{*_h}(x_i) = I(\hat\tau^{*_h}(x_i) > 0)$ as before. 
 
-$\tau MSE_{h}^{(\mathcal{T})}$ calculates how well the selected model estimates the treatment effect for individuals in the test set. $C^{(\mathcal{T})}$ is the decision value of applying the treatment policy $\hat d(x)$ derived from each selected model $\hat \tau (x)$ to the individuals in the test set.
+$\tau MSE_{h}^{(\mathcal{T})}$ calculates how well the selected model estimates the treatment effect for individuals in the test set. $v^{(\mathcal{T})}$ is the decision value of applying the treatment policy $\hat d(x)$ derived from each selected model $\hat \tau (x)$ to the individuals in the test set.
 
-These are both useful metrics, although only the first ($\tau MSE$, sometimes called ``precision in estimating heteorgenous effects'', or PEHE) has typically been used in simulation studies. To see why the test set decision value is also important, consider two models ($A$ and $B$) that estimate the same treatment effect for all individuals except for two ($i=1$ and $i=2$). Let $\tau(x_1) = \tau(x_2) = 0.1$ (i.e. both individuals would benefit from the treatment). Model $A$ estimates $\hat\tau_A(x_1) = -0.1$ and $\hat\tau_A(x_2) = 0.1$. In other words, it incorrectly suggests not treating individual $1$, although the absolute difference $|\hat\tau_A(x_1)-\tau(x_1)| = 0.2$ is quite small, so model $A$ is not heavily penalized by $\tau MSE$. Model $B$ estimates $\hat\tau_B(x_1) = 0.1$ and $\hat\tau_B(x_2) = 100$. Model $B$ correctly suggests the treatment for both individuals, but the absolute difference $|\hat\tau_B(x_2)-\tau(x_2)| = 99.9$ is large and is heavily penalized by $\tau MSE$. What we want is a model that correctly assigns treatment to the individuals who stand to benefit from it. Using $\tau MSE$ in this case would favor model $A$ even though it leads to the mistreatment of more individuals than model $B$ does. However, $\tau MSE$ is still a useful metric. There may be cases where a researcher is interested in the precise magnitude of the effect for each individual, perhaps so that she can allocate scarce resources most effectively.
+These are both useful metrics, although only the first ($\tau MSE$, sometimes called ``precision in estimating heteorgenous effects'', or PEHE) has typically been used in simulation studies. To see why the test set decision value is also important, consider two models ($A$ and $B$) that estimate the same treatment effect for all individuals, except two ($i=1$ and $i=2$). Let $\tau(x_1) = \tau(x_2) = 0.1$, i.e. both individuals would benefit from the treatment in reality. Model $A$ estimates $\hat\tau_A(x_1) = -0.1$ and $\hat\tau_A(x_2) = 0.1$. In other words, it incorrectly suggests not treating individual $1$, although the absolute difference $|\hat\tau_A(x_1)-\tau(x_1)| = 0.2$ is quite small, so it is not heavily penalized by $\tau MSE$. Model $B$ estimates $\hat\tau_B(x_1) = 0.1$ and $\hat\tau_B(x_2) = 100$. Model $B$ correctly suggests the treatment for both individuals, but the absolute difference $|\hat\tau_B(x_2)-\tau(x_2)| = 99.9$ is large and is heavily penalized by $\tau MSE$. Often, what we want is a model that correctly assigns treatment to the individuals who stand to benefit from it. Using $\tau MSE$ in this case would favor model $A$ even though it leads to the mistreatment of more individuals than model $B$ does. However, $\tau MSE$ is still a useful metric. There may be cases where a researcher is interested in the precise magnitude of the effect for each individual, perhaps so that scarce resources can be allocated most effectively. 
 
-We also calculate their minima over all the computed models $\hat\tau_m \in \{\hat\tau_1 \dots \hat\tau_M\}$:
+In our simulations, we also calculate the optima of both $v^{(\mathcal{T})}$ and $MSE^{(\mathcal{T})}$ over all the computed models $\hat\tau_m \in \{\hat\tau_1 \dots \hat\tau_M\}$:
 
 \[
 \tau MSE^{(\mathcal{T})}_{*} = \underset{m}{\text{min}} \ \ \frac{1}{|\mathcal{T}|}\sum_{i \in \mathcal{T}} (\hat\tau_m (x_i) - \tau(x_i))^2
@@ -99,7 +99,10 @@ We also calculate their minima over all the computed models $\hat\tau_m \in \{\h
 v^{(\mathcal{T})}_{*} = \underset{m}{\text{max}} \ \ \frac{1}{|\mathcal{T}|}\sum_{i \in \mathcal{T}} \mu_{\hat d_m(x_i)}(x_i)
 \]
 
-These quantities represent the best possible performance that any model selection method could acheive given the available models. We also calculate these using the true model $\hat\tau = \tau$, which represents the best achievable performance without specifying any models a-priori:
+These quantities represent the best possible performance that any model selection method could achieve given the available models in a given simulation. We use these quantities as baselines.
+
+\begin{comment}
+We also calculate these using the true model $\hat\tau = \tau$, which represents the best achievable performance without specifying any models a-priori:
 
 \[
 \tau MSE^{(\mathcal{T})}_{**} = 0
@@ -122,14 +125,22 @@ We use these minima to calculate the improvements obtained by each model selecti
 \]
 
 The closer to zero these are, the better the performance of the model selection method.
+\end{comment}
 
 \subsection{Results}
 
-Changing the number of cross-validation folds seems to have little effect, while moving from unbiased to biased treatment assignment tends to negatively impact the performance of the selected model regardless of the selection approach. 
+\begin{figure}
+\centering
+\includegraphics[width=\textwidth]{value-sim-comparison}
+\caption{Test-set decision value ($v_h$) of the model selected by each approach (y-axis) in each simulation (x-axis) relative to the test-set decision value of the true best model ($v_*$), averaged over each repetition of the simulation. Selection approaches are ranked top-to-bottom by averages of this quantity taken across all simulations. Values closer to zero indicate that the model selection approach choses better models on average.}
+\end{figure}
 
-Random model selection leads to reasonable performance in many simulations because all of the available models perform only somewhat worse than the best among them. This is reflective of real-world use where poor models or hyperparameter combinations are removed a-priori. 
+\begin{figure}
+\centering
+\includegraphics[width=\textwidth]{tmse-sim-comparison}
+\caption{Test-set treatment effect mean-squared-error ($\tau MSE_h$) of the model selected by each approach (y-axis) in each simulation (x-axis) relative to the test-set  treatment effect mean-squared-error of the true best model ($\tau MSE_*$), averaged over each repetition of the simulation. Selection approaches are ranked top-to-bottom by averages of this quantity taken across all simulations. Values closer to zero indicate that the model selection approach choses better models on average.}
+\end{figure}
 
-ITE loss-minimizing approaches perform well, but those that employ covariate matching are notably worse off in several simulations, likely due to the difficulty of finding good covariate matches in high dimensions. All of the approaches related to value estimation perform similarly, as expected, since the metrics they are optimizing have equivalent differences in expectation (theorem \ref{gain-value}). In some simulations with biased assignment, the traditional formulation of gain does poorly where our generalized version succeeds, presumably because our formulation correctly incorporates the propensity score. Of the AUC-style approaches, the Qini coefficient performs poorly, C-for-benefit performs reasonably, and our proposed value-at-k AUC does well. Stratifying on the predicted treatment effect as described in section \ref{te-match} fares poorly, as predicted. A straightforward application of outcome prediction MSE does very well.
+ITE loss-minimizing approaches perform well, but those that employ covariate matching are notably worse off in several simulations, likely due to the difficulty of finding good covariate matches in high dimensions. All of the approaches related to value estimation perform similarly, as expected, since the metrics they are optimizing have equivalent differences in expectation (theorem \ref{gain-value}). In some simulations with biased assignment, the traditional formulation of gain does poorly where our generalized version succeeds, presumably because our formulation correctly incorporates the propensity score. Of the AUC-style approaches, the Qini coefficient performs poorly, C-for-benefit performs reasonably, and our proposed value-at-k AUC does well. Stratifying on the predicted treatment effect as described in section \ref{te-match} fares poorly, as predicted. A straightforward application of outcome prediction MSE does very well. Random model selection leads to reasonable performance in many simulations because all of the available models perform only somewhat worse than the best among them. This is reflective of real-world use where poor models or hyperparameter combinations are removed a-priori. 
 
-
-
+Relative performance between methods is similar when gauged by test-set decision value and by test-set $\tau MSE$. 
