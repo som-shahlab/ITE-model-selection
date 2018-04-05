@@ -74,24 +74,24 @@ fit_model = function(data, train_index, method, tune_grid) {
     }
 }
 
-prep_fold_data = function(training_data, test_data) {
-	data = bind_rows(training_data, test_data) %>%
+prep_fold_data = function(training_data, validation_data) {
+	data = bind_rows(training_data, validation_data) %>%
 		mutate(rowIndex=row_number())
-	index = list(c(data %>% 
-					filter(sample_type=="training") %>% 
-					pull(rowIndex)))
+	index = data %>% 
+		filter(sample_type=="training") %>% 
+		pull(rowIndex)
 	return(list(data=data, index=index))
 }
 
 test_estimate_hte = function(data, method, tune_grid, fold, fold_name) {
 	training_data = data[fold,] %>% mutate(sample_type="training")
-	test_data = data[-fold,] %>% mutate(sample_type="test")
+	validation_data = data[-fold,] %>% mutate(sample_type="test")
 
 	fold_data = training_data %>% 
 		split(.$treatment) %>%
-		map(~prep_fold_data(., test_data)) #now have a list (treat => (data, fold))
-	predictions = fold_data %>%
-		map(~fit_model(.$data, .$index, method, tune_grid)$pred) # returns the big matrix with all test set predictions for each treatment
+		map(~prep_fold_data(., validation_data)) #now have a list (treat => (data, fold))
+	predictions = fold_data %>% # fit one model to each treatment group
+		map(~fit_model(.$data, .$index, method, tune_grid)) # returns the big matrix with all test set predictions for each treatment
 	test_estimates = fold_data %>%
 	    map(~select(.$data, subject, treatment, time, event, rowIndex)) %>%
 	    list(predictions) %>%
