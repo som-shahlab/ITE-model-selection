@@ -42,17 +42,36 @@
 # }
 
 
+gbm_ph_fit_predict = function(x_train, y_train, x_val, rowIndex, interaction.depth, n.minobsinnode, shrinkage, n.trees) {
+    model = gbm.fit(x_train, y_train, distribution="coxph", verbose=F,
+                    n.trees=max(n.trees), interaction.depth=interaction.depth, 
+                    shrinkage=shrinkage, n.minobsinnode=n.minobsinnode)
+    predict(model, x_val, n.trees=n.trees) %>% 
+        data.frame %>%
+        mutate(rowIndex=rowIndex, interaction.depth=interaction.depth, 
+               shrinkage=shrinkage, n.minobsinnode=n.minobsinnode) %>%
+        gather(n.trees, pred, -rowIndex, -interaction.depth, -shrinkage, -n.minobsinnode) %>%
+        mutate(n.trees = str_replace(n.trees,"X","") %>% as.numeric)
+}
+
+# the thing that is estimated by coxph models is the log relative (to the basline) risk 
 fit_model = function(data, train_index, method, tune_grid) {
-	train(
-		  x = data %>% dplyr::select(starts_with("covariate")) %>% as.matrix,
-		  y = data$outcome,
-		  method = method,
-		  trControl = trainControl(method='cv', # will feed in 1 fold at a time
-                                 number=length(train_index),
-		  						 index=train_index,
-                                 returnResamp="all",
-                                 savePredictions="all"),
-		  tuneGrid = tune_grid)
+    x_train = data[train_index,] %>% dplyr::select(starts_with("covariate")) %>% as.matrix
+    y_train = data[train_index,] %$% Surv(time, event)
+    x_val = data[-train_index,] %>% dplyr::select(starts_with("covariate")) %>% as.matrix
+    rowIndex = data[-train_index,] %>% pull(subject)
+    
+    if(method=="gbm") {
+        grouped_tune_grid = tune_grid %>% 
+            group_by(interaction.depth, n.minobsinnode, shrinkage) %>%
+            summarize(n.trees=list(n.trees))
+        grouped_tune_grid %>%
+            pmap(function(interaction.depth, n.minobsinnode, shrinkage, n.trees) {
+                gbm_ph_fit_predict(x_train, y_train, x_val, rowIndex,
+                                   interaction.depth, n.minobsinnode, 
+                                   shrinkage, n.trees)}) %>%
+            bind_rows()
+    }
 }
 
 prep_fold_data = function(training_data, test_data) {
@@ -74,17 +93,17 @@ test_estimate_hte = function(data, method, tune_grid, fold, fold_name) {
 	predictions = fold_data %>%
 		map(~fit_model(.$data, .$index, method, tune_grid)$pred) # returns the big matrix with all test set predictions for each treatment
 	test_estimates = fold_data %>%
-	    map(~select(.$data, subject, treatment, outcome, rowIndex)) %>%
+	    map(~select(.$data, subject, treatment, time, event, rowIndex)) %>%
 	    list(predictions) %>%
 	    pmap(function(data, predictions) inner_join(data, predictions, by="rowIndex")) %>%
-	    imap(function(df,name) rename_(df, .dots=setNames("pred", str_c("est_outcome", name, sep="_")))) %>%
-	    reduce(inner_join, by=c("subject", "treatment", "outcome", names(tune_grid))) %>% # will join on all columns... if didn't want to join on params would also have to join across methods!
+	    imap(function(df,name) rename_(df, .dots=setNames("pred", str_c("est_rel_risk", name, sep="_")))) %>% # df_TRUE$pred and df_FALSE$pred become (est_rel_risk_TRUE, ..._FALSE) in the same df
+	    reduce(inner_join, by=c("subject", "treatment", "time", "event", names(tune_grid))) %>% # will join on all columns... if didn't want to join on params would also have to join across methods!
 	    mutate(method=method) %>%
 	    unite_("model", c("method", names(tune_grid)), sep="~") %>% 
 	    mutate(fold=fold_name) %>%
-	    mutate(est_effect=est_outcome_TRUE-est_outcome_FALSE, 
-	    	   est_outcome=treatment*(est_outcome_TRUE) + (1-treatment)*est_outcome_FALSE) %>%
-	    select(subject, model, treatment, outcome, est_effect, est_outcome, fold) 
+	    mutate(est_effect=est_rel_risk_TRUE-est_rel_risk_FALSE, 
+	    	   est_rel_risk=treatment*(est_rel_risk_TRUE) + (1-treatment)*est_rel_risk_FALSE) %>% # selects the estimated time, event from the appropriate model
+	    select(subject, model, treatment, time, event, est_effect, est_rel_risk, fold) 
 }
 
 cross_estimate_hte = function(data, method, tune_grid, train_index) {
@@ -92,6 +111,7 @@ cross_estimate_hte = function(data, method, tune_grid, train_index) {
 	imap(function(fold, fold_name) test_estimate_hte(data, method, tune_grid, fold, fold_name)) %>%
 	bind_rows()
 }
+
 
 # methods = list("xgbTree", "lm")
 # tune_grids = list(expand.grid(nrounds = 1:150, max_depth = 2, eta = 0.1), NULL)

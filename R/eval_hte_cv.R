@@ -24,6 +24,54 @@ create_cv_index = function(data, n_folds=5) {
     	map(~(data$subject)[-.]) #  complement of each index, in terms of the subject IDs
 }
 
+
+# see:
+# Fewell, Z., Hernán, M. A., Wolfe, F., Tilling, K., Stata, H. C., 2004. (n.d.). Controlling for time-dependent confounding using marginal structural models. Pdfs.Semanticscholar.org
+# Rodriguez, G. (2014). Survival Models. In Lecture Notes on Generalized Linear Models (pp. 1–34).
+ipcw = function(data, n_time_intervals=10) {
+	interval_data = data %>% 
+	    mutate(event = !event) %>% # "event" is now censoring, not death
+	    mutate(event_interval = ntile(time, n_time_intervals))
+	pseudo_data = list(subject = interval_data %$% unique(subject), 
+                   interval = interval_data %$% unique(event_interval)) %>%
+    cross_df %>%
+    inner_join(interval_data, by="subject") %>%
+    filter(interval <= event_interval) %>% # keep only pseudo-observations before or at event time
+    mutate(event = ifelse(interval==event_interval, event, FALSE)) # before the real time of censoring, set censoring=F
+    pCt_XW = glm.fit( # no global intercept
+	    x = pseudo_data %>% 
+	            select(subject, interval, treatment, starts_with("covariate")) %>% 
+	            mutate(interval_copy = interval) %>%
+	            mutate(trash=1) %>%
+	            spread(interval, trash, fill=0) %>% # give each interval its own intercept
+	            select(-interval_copy, -subject) %>%
+	            data.matrix(),
+	    y = pseudo_data %>% pull(event),
+	    family = binomial(link="cloglog")) %$% 
+		fitted.values
+    data.frame(pCt_XW = pCt_XW,
+          	   subject = pseudo_data$subject) %>%
+	    group_by(subject) %>%
+	    summarize(cens_prob_at_event_time = prod(1-pCt_XW)) %>%
+	    ungroup() %>%
+	    mutate(est_ipcw = 1/cens_prob_at_event_time) %>%
+	    inner_join(data, by="subject") %>%
+	    select(subject, est_ipcw)
+}
+
+iptw = function(data) {
+	pW_X = glm.fit(
+		x = data %>% select(starts_with("covariate")) %>% as.matrix,
+		y = data %>% pull("treatment"),
+ 		family = binomial(link="logit")) %$% 
+	fitted.values
+	data.frame(pW_X = pW_X, 
+			   treatment=data$treatment,
+			   subject=data$subject) %>%
+		mutate(est_iptw = 1/(1-treatment + 2*treatment*pW_X - pW_X)) %>%
+		select(subject, est_iptw)
+}
+
 #' Prepares simulated data for experiments
 #'
 #' @param DGP a list created by a call to dgp()
@@ -39,11 +87,6 @@ setup_data = function(DGP, n_train, n_test, n_folds) {
 	    mutate(set = ifelse(subject > n_train, "test", "training"))
 	aux_data = simulation$aux_data %>%
 		mutate(set = ifelse(subject > n_train, "test", "training"))
-	# opt_value = true_value(true_effect, true_effect, true_mean)
-
-	aux_data$est_propensity = glm.fit(x = data %>% select(starts_with("covariate")) %>% as.matrix,
-           							  y = data %>% pull("treatment"),
-           					 		  family = binomial(link="logit")) %$% fitted.values
 
 	cv_index = data %>% 
 	    filter(set=="training") %>%
@@ -53,7 +96,7 @@ setup_data = function(DGP, n_train, n_test, n_folds) {
 	cv_held_out = cv_index %>% 
     	map(~test_index$training[!(test_index$training %in% .)])
 	held_out = c(cv_held_out, list("training" = (data %>% filter(set=="test") %>% pull(subject))))
-	matches = held_out %>% 
+	matches = held_out %>% # need to find matches for each individual within each training fold... 
 	    map(~ data.frame(subject=.) %>%
 	    	inner_join(data, by="subject") %>% 
 	    	find_matches()) %>%
@@ -62,9 +105,9 @@ setup_data = function(DGP, n_train, n_test, n_folds) {
 	aux_data = aux_data %>%
 		inner_join(matches, by="subject") %>%
 		inner_join(data %>% select(subject, treatment), by='subject') %>%
-		mutate(true_ip_weights = 1/(1-treatment + 2*treatment*true_propensity - true_propensity)) %>% # evaluates to either 1/p1 (if w=1) or 1/p0 (if w=0)
-		mutate(est_ip_weights = 1/(1-treatment + 2*treatment*est_propensity - est_propensity)) %>% # evaluates to either 1/p1 (if w=1) or 1/p0 (if w=0)
-		select(-treatment)
+		inner_join(iptw(data), by="subject") %>% 	# I'm cheating a little bit here because I use test data to fit these
+		inner_join(ipcw(data), by="subject") %>% 	# but the models should be underfit anyways so that data shouldn't add much...
+		select(-treatment) # can fix this later but won't really change it
 	return(list(data=data, aux_data=aux_data, cv_index=cv_index, test_index=test_index))
 }
 

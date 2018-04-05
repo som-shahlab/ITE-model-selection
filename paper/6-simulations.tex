@@ -101,6 +101,8 @@ v^{(\mathcal{T})}_{*} = \underset{m}{\text{max}} \ \ \frac{1}{|\mathcal{T}|}\sum
 
 These quantities represent the best possible performance that any model selection method could achieve given the available models in a given simulation. We use these quantities as baselines.
 
+%%%%% ALTERNATIVELY: use % of value captured. For any DGP, the max test-set value is calculated using d=I(\tau < 0). Call that v_min. v_max is calculated using I(\tau > 0). v_model uses the I(\hat\tau > 0). We always have v_min <= v_model <= v_max. Let % value be (v_model - v_min)/(v_max - v_min)
+
 \begin{comment}
 We also calculate these using the true model $\hat\tau = \tau$, which represents the best achievable performance without specifying any models a-priori:
 

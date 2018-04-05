@@ -5,16 +5,26 @@
 #' @import stringr
 #' @import caret
 #' @import Matching
+#' @import distr
+#' @import distrEx
+
+## Each patient will now get their own control Y0 and treatment Y1 distributions from 
+# package distr, with parameters f(X) for more or less arbitrary f()
+# Then we'll calculate tau as E[Y1] - E[Y0] using the E() function
+# from distrEx. 
+# yi = w_i*r(Y1) + (1-w_i)*r(Y0)
+# 
 
 data_list_to_df = function(data_list) {
-    data_list$covariates %<>% set_names(paste("covariate", 1:ncol(.), sep="_"))
-    data_list %$% cbind(subject, outcome, treatment, covariates) %>% data.frame
+    data_list$covariates %<>% data.frame %>% set_names(paste("covariate", 1:ncol(.), sep="_"))
+    data_list %$% cbind(subject, event, time, treatment, covariates) %>% data.frame
 }
 
 data_df_to_list = function(data_df) {
     data_list = list()
     data_list$subject = data_df %>% pull(subject)
-    data_list$outcome = data_df %>% pull(outcome)
+    data_list$outcome = data_df %>% pull(outcome) # an indicator: 1 for death, 0 for censoring
+    data_list$time = data_df %>% pull(time) # the time of either death or censoring
     data_list$treatment = data_df %>% pull(treatment)
     data_list$covariates = as.matrix(data_df %>% select(starts_with()))
     return(data_list)
@@ -25,17 +35,23 @@ data_df_to_list = function(data_df) {
 #' Generates N tuples from the joint distribution of P(X,W,Y).
 #' Returns a list with two elements: a dataframe called data and a dataframe 
 #' called aux_data containing true expecations conditional on X.
-#' @param covariate_fun a function that randomly takes n samples from P(X)
-#' @param mean_fun a vectorized function of a vector-valued arugment x that defines E[Y|X=x]
-#' @param effect_fun a vectorized function of a single vector-valued arugment x that defines E[Y|W=1,X=x] - E[Y|W=0,X=x]
-#' @param propensity_fun a vectorized function of a single vector-valued arugment x that defines E[W|X=x]
-#' @param sigma standard deviation of the normally distributed zero-mean additive noise to Y
+#' @param X a list of distribution objects that generate a covariate vector
+#' @param f_W_x a function of x that returns the conditional distribution W|X=x
+#' @param f_Y_xw a function of x, w that returns the conditional distribution Y|X=x,W=w
+#' @param f_C_xw a function of x, w that returns the conditional distribution C|X=x,W=w
 #' @keywords
 #' @export
 #' @examples
-dgp = function(covariate_fun, propensity_fun, mean_fun, effect_fun, sigma) {
-    list(covariate_fun=covariate_fun, mean_fun=mean_fun, propensity_fun=propensity_fun, 
-         effect_fun=effect_fun, sigma=sigma)
+dgp = function() {
+    list(X=X, f_W_x=f_W_x, f_Y_xw=f_Y_xw, f_C_xw=f_C_xw)
+}
+# These functions e.g. f_W_X will likely be generated on-the-fly:
+# make_f_W_X_dist = function(f1, f2, ...) {
+#       function(x) SomeDist(param1 = f1(x), param2 = f2(x)... )
+# }
+
+sample1 = function(dist) {
+    r(dist)(1)
 }
 
 #' Generate simulated observational data
@@ -49,30 +65,48 @@ dgp = function(covariate_fun, propensity_fun, mean_fun, effect_fun, sigma) {
 #' @export
 #' @examples
 create_data = function(DGP, n=1) {
-    X = DGP$covariate_fun(n)
+    x = n %>% rerun(DGP$X %>% map_dbl(sample1)) 
 
-    mu = DGP$mean_fun(X)
-    tau = DGP$effect_fun(X)
-    p = DGP$propensity_fun(X)
+    W = x %>% map(DGP$f_W_x) 
+    w = W %>% map_dbl(sample1)
+    pw = W %>% map_dbl(E) # propensity scores
 
-    W = rbinom(n, 1, p)
-    Y = mu + tau * (2*W - 1) / 2 + rnorm(n, 0, DGP$sigma)
+    Y1 = x %>% map(~DGP$f_Y_xw(.,1))
+    Y0 = x %>% map(~DGP$f_Y_xw(.,0)) 
+    mu1 = Y1 %>% map_dbl(E)
+    mu0 = Y0 %>% map_dbl(E)
+    tau = mu1 - mu0
+    y = list(w,Y1,Y0) %>% 
+        pmap_dbl(function(w, Y1, Y0) ifelse(w, sample1(Y1), sample1(Y0)))
+
+    C1 = x %>% map(~DGP$f_C_xw(.,0))
+    C0 = x %>% map(~DGP$f_C_xw(.,1))
+    ce = list(w,C1,C0) %>% 
+        pmap_dbl(function(w, C1, C0) ifelse(w, sample1(C1), sample1(C0)))
+
+    t = pmin(y,ce)
+    d = y < ce
+
+    pc = list(w, t, C1, C0) %>% # censoring probability at t
+         pmap_dbl(function(w,t,C1,C0) ifelse(w, 1-p(C1)(t), 1-p(C0)(t)))
 
     data = list()
-    data$subject = 1:length(Y)
-    data$outcome = Y
-    data$treatment = as.logical(W)
-    data$covariates = X %>% data.frame
+    data$subject = 1:length(w)
+    data$time = t
+    data$event = d
+    data$treatment = as.logical(w)
+    data$covariates = x %>% reduce(rbind)
+    rownames(data$covariates) = NULL
 
-    aux_data = data.frame(subject=data$subject, true_mean=mu, true_effect=tau, true_propensity=p)
+    aux_data = data.frame(
+        subject=data$subject, 
+        treated_mean=mu1, 
+        control_mean=mu0, 
+        effect=tau,
+        iptw=1/(1-w + 2*w*pw - pw),
+        ipcw=1/pc)
 
     return(list(data=(data %>% data_list_to_df), aux_data=aux_data))
-}
-
-x1 = function(n, p=10) {
-    X = matrix(rnorm(n*p), nrow = n, ncol = p)
-    X[, seq(2, p, by = 2)] = (X[, seq(2, p, by = 2)] > 0)
-    return(X)
 }
 
 f1 = function(x) rep(0, nrow(x))
@@ -122,39 +156,33 @@ f8 = function(x) (f4(x) + f5(x)) / sqrt(2)
 
 f9 = function(x) (x[,1])^2 - 1
 
-create_p_rand = function(p=0.5) {
-    function(x) {
-        rep(p, nrow(x))
-    }
-}
-
-create_p_bias = function(mean_fun, effect_fun) {
-    function(x) {
-        log_p = (mean_fun(x) - effect_fun(x))/2
-        exp(log_p) / (1 + exp(log_p))
-    }
-}
-
-#' Simulations from Powers et al. 2018
+#' Simulations 
 #'
-#' Creates a set of data generating processes from Powers et al 2018 that can be passed to the
-#' create_data function to simulate observational data
 #' @export
-powers_DGPs = function() {
-    unbiased_DGPs = list(
-        scenario_1 = dgp(x1, create_p_rand(), f8, f1, 1),
-        scenario_2 = dgp(x1, create_p_rand(), f5, f2, 0.25),
-        scenario_3 = dgp(x1, create_p_rand(), f4, f3, 1),
-        scenario_4 = dgp(x1, create_p_rand(), f7, f4, 0.25),
-        scenario_5 = dgp(x1, create_p_rand(), f3, f5, 1),
-        scenario_6 = dgp(x1, create_p_rand(), f1, f6, 1),
-        scenario_7 = dgp(x1, create_p_rand(), f2, f7, 4),
-        scenario_8 = dgp(x1, create_p_rand(), f6, f8, 4)
-    )
-    biased_DGPs = unbiased_DGPs %>%
-        map(~dgp(.$covariate_fun, 
-             create_p_bias(.$mean_fun, .$effect_fun), 
-             .$mean_fun, .$effect_fun, .$sigma))
-    names(biased_DGPs) = names(unbiased_DGPs) %>% map(~str_c("biased", ., sep="_"))
-    c(unbiased_DGPs, biased_DGPs)
+schuler_DGPs = function() {
+    X = list(Norm(-1), Norm(1))
+
+    f_W_x = function(x, w) {
+        logit_p = x[1] + x[2]
+        p = exp(logit_p) / (1 + exp(logit_p))
+        Binom(prob=p)
+    }
+
+    f_Y_xw = function(x, w) {
+        if(w) {
+            Weibull(scale=abs(x[1] + x[2]) + 0.7, 
+                    shape=1.2)
+        } else {
+            Weibull(scale= abs(x[1]) + abs(x[2]), 
+                    shape=1.5)
+        }
+    }
+
+    f_C_xw = function(x, w) {
+        Weibull(scale=4, 
+                shape=1.4)
+    }
+
+    list("biased" = dgp(X, function(x,w) 0.5, f_Y_xw, f_C_xw), 
+         "unbiased" = dgp(X, f_W_x, f_Y_xw, f_C_xw))
 }
