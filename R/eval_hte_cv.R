@@ -93,17 +93,7 @@ setup_data = function(DGP, n_train, n_test, n_folds) {
 	    create_cv_index(n_folds=n_folds)
 	test_index = list("training" = (data %>% filter(set=="training") %>% pull(subject)))
 
-	cv_held_out = cv_index %>% 
-    	map(~test_index$training[!(test_index$training %in% .)])
-	held_out = c(cv_held_out, list("training" = (data %>% filter(set=="test") %>% pull(subject))))
-	matches = held_out %>% # need to find matches for each individual within each training fold... 
-	    map(~ data.frame(subject=.) %>%
-	    	inner_join(data, by="subject") %>% 
-	    	find_matches()) %>%
-	    bind_rows(.id="fold")
-
 	aux_data = aux_data %>%
-		inner_join(matches, by="subject") %>%
 		inner_join(data %>% select(subject, treatment), by='subject') %>%
 		inner_join(iptw(data), by="subject") %>% 	# I'm cheating a little bit here because I use test data to fit these
 		inner_join(ipcw(data), by="subject") %>% 	# but the models should be underfit anyways so that data shouldn't add much...
@@ -140,27 +130,8 @@ compute_cv_metrics = function(estimates) {
 	    dplyr::group_by(model, fold) %>% # I do this for each fold
 	    # mutate(est_effect_test_match = est_effect_covariate_matching(treatment, outcome, subject, match),
 	    	   # est_effect_test_trans = est_effect_transformed_outcome(treatment, outcome, ip_weights)) %>%
-	    dplyr::summarize(#### framework: ###
-	    				 match_mse = est_effect_covariate_matching(treatment, outcome, subject, match) %>% loss_squared_error(est_effect),
-	    				 trans_mse = est_effect_transformed_outcome(treatment, outcome, true_ip_weights) %>% loss_squared_error(est_effect), 
-						 trans_mse_est_prop = est_effect_transformed_outcome(treatment, outcome, est_ip_weights) %>% loss_squared_error(est_effect), 
-	    				 match_decision = est_effect_covariate_matching(treatment, outcome, subject, match) %>% loss_decision(est_effect),
-	    				 trans_decision = est_effect_transformed_outcome(treatment, outcome, true_ip_weights) %>% loss_decision(est_effect), # aka gain!
-	    				 trans_decision_est_prop = est_effect_transformed_outcome(treatment, outcome, est_ip_weights) %>% loss_decision(est_effect), # aka gain!
-	    				 #### value: ####
-						 value = -value(est_effect, treatment, outcome, weights=true_ip_weights),
-						 gain = -gain(est_effect, treatment, outcome),
-						 value_est_prop = -value(est_effect, treatment, outcome, weights=est_ip_weights),
-						 # #### broken: ####
-	    				 prediction_error = loss_squared_error(est_outcome, outcome),
-	                     est_te_strata = est_effect_transformed_outcome(treatment, outcome, est_effect) %>% loss_squared_error(est_effect),
-	                     #### ranking: ####
-	                     c_benefit = -c_benefit(est_effect, treatment, outcome),
-	                     qini = -qini(est_effect, treatment, outcome, true_ip_weights),
-	                     qini_est_prop = -qini(est_effect, treatment, outcome, est_ip_weights),
-	                     value_auc = -value_auc(est_effect, treatment, outcome, true_ip_weights),
-	                     value_auc_est_prop = -value_auc(est_effect, treatment, outcome, est_ip_weights),
-	                     ### random: ####
+	    dplyr::summarize(value = value(est_effect, treatment, time, event, IPTW=est_iptw),
+	    				 c_stat = c_stat(est_rel_risk, time, event, treatment, IPCW=est_ipcw),
 	                     random = random_metric()
 	                     ) %>%
 	   	dplyr::ungroup() %>% dplyr::select(-fold) %>% dplyr::group_by(model) %>% # Then average over the folds
@@ -170,11 +141,10 @@ compute_cv_metrics = function(estimates) {
 compute_test_metrics = function(estimates) {
 	estimates  %>%
 	    dplyr::group_by(model) %>% # there should only be one fold
-	    dplyr::summarize(true_hte_error = loss_squared_error(est_effect, true_effect),
-	                     true_value = -true_value(est_effect, true_effect, true_mean)) 
+	    dplyr::summarize(true_value = true_value(est_effect, treated_mean, control_mean))
 }
 
-#' Estimates estimated cv errors and true test errors (the latter via true values in aux_data). 
+#' Estimates estimated cv metrics and true test metrics (the latter via true values in aux_data). 
 #'
 #' @param cv_estimates  cv_estimates 
 #' @param test_estimates test_estimates 
@@ -182,32 +152,34 @@ compute_test_metrics = function(estimates) {
 #' @keywords
 #' @export
 #' @examples
-get_errors = function(cv_estimates, test_estimates, aux_data) {
-	cv_error = cv_estimates %>% 
-		inner_join(aux_data, by=c("subject", "fold")) %>%
+get_metrics = function(cv_estimates, test_estimates, aux_data) {
+	cv_metrics = cv_estimates %>% 
+		inner_join(aux_data, by="subject") %>%
     	compute_cv_metrics() %>%
-        gather(selection_method, error, -model)
-	min_cv_error = cv_error %>%
+        gather(selection_method, metrics, -model)
+	best_cv_metrics = cv_metrics %>%
 	    group_by(selection_method) %>%
-	    filter(error == min(error, na.rm=T)) %>%
-	    sample_n(1) %>% # if there are ties for the lowest error, break at random
-	    select(-error) %>% ungroup()
-	test_error = test_estimates %>% 
-		inner_join(aux_data, by=c("subject", "fold")) %>%
+	    filter(metrics == max(metrics, na.rm=T)) %>%
+	    sample_n(1) %>% # if there are ties for the lowest metrics, break at random
+	    select(-metrics) %>% ungroup()
+	test_metrics = test_estimates %>% 
+		inner_join(aux_data, by="subject") %>%
 	    compute_test_metrics()
-	oracle_error = test_error %>%
-		gather(selection_method, error, -model) %>%
+	oracle_metrics = test_metrics %>%
+		gather(selection_method, metrics, -model) %>%
 		group_by(selection_method) %>%
-	    filter(error == min(error, na.rm=T)) %>%
+	    filter(metrics == max(metrics, na.rm=T)) %>%
 	    sample_n(1) %>%
-		select(-error) %>% ungroup() %>%
+		select(-metrics) %>% ungroup() %>%
 		mutate(selection_method = str_c("oracle_selector", selection_method, sep="_"))
-	true_selection_error = min_cv_error %>%
-		bind_rows(oracle_error) %>%
-	    inner_join(test_error, by="model") %>%
-	    bind_rows(data.frame(model="truth", selection_method="oracle", true_hte_error=0,  # this is the true model
-	    					 true_value=-(aux_data %>% filter(set=="test") %$% true_value(true_effect, true_effect, true_mean)))) # this needs to be evaluated just over the test set!!!
+	true_selection_metrics = best_cv_metrics %>%
+		bind_rows(oracle_metrics) %>%
+	    inner_join(test_metrics, by="model") %>%
+	    bind_rows(data.frame(model="truth", selection_method="oracle",  # this is the true model
+	    					 true_value=(aux_data %>% filter(set=="test") %$% true_value(-effect, treated_mean, control_mean)))) %>% 
+	    bind_rows(data.frame(model="harm", selection_method="demon",  # this is the true "evil" model
+	    					 true_value=(aux_data %>% filter(set=="test") %$% true_value(effect, treated_mean, control_mean)))) 
 	    # mutate(optimal_deficiency = -true_hte_value(true_effect, true_effect, true_mean)) # %>%
 	    # mutate(scenario=scenario, n_folds=n_folds, training_percent=training_percent, rep=rep)
-	return(list(cv_error=cv_error, test_error=test_error, true_selection_error=true_selection_error))
+	return(list(cv_metrics=cv_metrics, test_metrics=test_metrics, true_selection_metrics=true_selection_metrics))
 }

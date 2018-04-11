@@ -5,132 +5,41 @@
 #' @import caret
 #' @import Matching
 
-####################################################
-############# FRAMEWORK METHODS ####################
-####################################################
-
-### Estimators for check tau
-
-est_effect_covariate_matching = function(treatment, outcome, subject, match) {
-	data.frame(subject=subject, match=match, treatment=treatment, 
-			   subject_outcome=outcome) %>%
-		inner_join(data.frame(match=subject, match_outcome=outcome), by="match") %>%
-		mutate(est_effect_test = (2*treatment-1)*(subject_outcome - match_outcome)) %>%
-		pull(est_effect_test)
-}
-
-est_effect_transformed_outcome = function(treatment, outcome, weights) {
-	weights*outcome*(2*treatment - 1)
-}
-
-est_effect_strata = function(treatment, outcome, strat_var, n_strata=10) {
-	data.frame(strat_var, outcome, treatment) %>%
-		mutate(strata = ntile(strat_var, n_strata)) %>%
-		dplyr::group_by(strata) %>%
-		dplyr::mutate(mean_treated_outcome = sum(outcome*treatment)/sum(treatment),
-				  mean_control_outcome = sum(outcome*!treatment)/sum(!treatment)) %>%
-		dplyr::mutate(te_estimate = mean_treated_outcome - mean_control_outcome) %>%
-		pull(te_estimate)
-}
-
-loss_squared_error = function(truth, estimate) {
-	mean((estimate-truth)^2)
-}
-
-loss_decision = function(truth, estimate, cutoff=0) {
-	mean(-truth*(estimate>=cutoff))
-}
-
-#####################################################
-############# NON-FRAMEWORK METHODS #################
-#####################################################
-
-
-est_te_match = function(est_effect, treatment, outcome) {
-	match = Match(Tr=treatment, 
-				  X=est_effect,
-				  replace=T, estimand="ATT")
-	delta = outcome[match$index.treated] - outcome[match$index.control]
-	return(loss_squared_error(delta, est_effect))
-}
-
-### Value Methods ###
-
-true_value = function(est_effect, true_effect, true_mean, cutoff=0) {
-	do_treat = est_effect >= cutoff
-	mean(true_mean + true_effect*(2*do_treat - 1) / 2)
-}
-
-value = function(est_effect, treatment, outcome, cutoff=0, weights=1) {
-	do_treat = est_effect >= cutoff
-	weighted_outcome = weights*outcome
-	sum(weighted_outcome[do_treat==treatment])/(length(est_effect))
-}
-
-gain = function(est_effect, treatment, outcome, cutoff=0) {
-	do_treat = est_effect >= cutoff
-	(mean(outcome[do_treat & treatment]) - mean(outcome[do_treat & !treatment]))*sum(do_treat)/length(est_effect)
-}
-
-# c_benefit_k = function(est_effect, treatment, outcome, cutoff=0, weights=1) {
-# 	do_treat = est_effect >= cutoff
-# 	weighted_outcome = weights*outcome
-# 	(mean(weighted_outcome[do_treat & treatment]) - mean(weighted_outcome[do_treat & !treatment]))*sum(do_treat)/length(est_effect) -
-# 	(mean(weighted_outcome[!do_treat & treatment]) - mean(weighted_outcome[!do_treat & !treatment]))*sum(!do_treat)/length(est_effect)
-# }
-
-# value_max = function(est_effect, treatment, outcome, weights=1) {
-# 	weighted_outcome = weights*outcome
-# 	data.frame(est_effect, treatment, weighted_outcome) %>%
-# 		arrange(-est_effect) %>%
-# 		mutate(Yt_lucky = cumsum(weighted_outcome*treatment)) %>%
-# 		arrange(est_effect) %>%
-# 		mutate(Yc_lucky = cumsum(weighted_outcome*!treatment)) %>%
-# 		mutate(value = (Yt_lucky + Yc_lucky)/n()) %>%
-# 		filter(!is.nan(value)) %>%
-# 		pull(value) %>% max
-# }
-
-### AUC-type Methods ###
-
-c_benefit = function(est_effect, treatment, outcome) {
-	match = Match(Tr=treatment, 
-				  X=est_effect,
-				  replace=T, estimand="ATT")
-	delta = outcome[match$index.treated] - outcome[match$index.control]
-	ranked_pairs = data.frame(delta, est_effect=est_effect[match$index.treated]) %>%
-		arrange(est_effect) %>% # from smallest to biggest 
-		mutate(effect_rank=row_number(), trash_join_var=1)
-	inner_join(ranked_pairs, ranked_pairs, by="trash_join_var") %>%
-		mutate(concordant=((effect_rank.x<effect_rank.y) & (delta.x<delta.y))) %>%
-		pull(concordant) %>% 
-		mean()
-}
-
-qini = function(est_effect, treatment, outcome, weights=1) {
-	weighted_outcome = weights*outcome
-	data.frame(est_effect, treatment, outcome) %>%
-		arrange(-est_effect) %>%
-		mutate(Yt = cumsum(outcome*treatment),
-			   Yc = cumsum(outcome*(!treatment)),
-			   Nt = cumsum(treatment),
-			   Nc = cumsum(!treatment)) %>%
-		mutate(uplift = (Yt/Nt - Yc/Nc)*(Nt+Nc)/n()) %>%
-		filter(!is.nan(uplift)) %>%
-		sum()  
-}
-
-value_auc = function(est_effect, treatment, outcome, weights=1) {
-	weighted_outcome = weights*outcome
-	data.frame(est_effect, treatment, outcome) %>%
-		arrange(-est_effect) %>%
-		mutate(Yt_lucky = cumsum(outcome*treatment)) %>%
-		arrange(est_effect) %>%
-		mutate(Yc_lucky = cumsum(outcome*!treatment)) %>%
-		mutate(value = (Yt_lucky + Yc_lucky)/n()) %>%
-		filter(!is.nan(value)) %>%
-		pull(value) %>% 
+# from https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3079915/
+c_stat = function(est_rel_risk, time, event, treatment, IPCW=1) {
+	event_data = data.frame(est_rel_risk=est_rel_risk, time=time, event=event, treatment=treatment, IPCW=IPCW, dummy=0) %>%
+		filter(event)
+	# print(event_data)
+	ordered_data = inner_join(event_data, event_data, by="dummy") %>%
+		filter(time.x < time.y)
+		# print(ordered_data)
+	denominator = (ordered_data$IPCW.x)^2 %>% sum
+	numerator = ordered_data %>%
+		filter(est_rel_risk.x > est_rel_risk.y) %>%
+		mutate(IPCW=IPCW.x^2) %>%
+		pull(IPCW) %>%
 		sum()
+	return(numerator/denominator) # the higher (closer to 1) the better
+}
+
+value = function(est_effect, treatment, time, event, IPTW=1) {
+	data.frame(est_effect=est_effect, treatment=treatment, time=time, event=event, IPTW=IPTW) %>%
+		mutate(do_treat = est_effect < 0) %>% # treat if the log-relative risk is negative
+		filter(do_treat == treatment) %>% # the "lucky" individuals
+		arrange(-time) %>%
+		mutate(weighted_n_alive = cumsum(IPTW)) %>%
+		arrange(time) %>%
+		mutate(km_surv = cumprod(1-(event*IPTW)/weighted_n_alive)) %>%
+		mutate(dt = lead(time) - time) %>%
+		mutate(rest_mean_survival = km_surv*dt) %>%
+		pull(rest_mean_survival) %>% 
+		sum(na.rm=T) # an estimate of the restricted mean survival time of the lucky patients
+}
+
+true_value = function(est_effect, treated_mean, control_mean) {
+	do_treat = est_effect < 0 # treat if the log-relative risk is negative
+	obs_mean = do_treat*treated_mean + (1-do_treat)*control_mean
+	mean(obs_mean)
 }
 
 random_metric = function(){ return(0)}
