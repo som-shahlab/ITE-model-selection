@@ -85,7 +85,7 @@ prep_fold_data = function(training_data, validation_data) {
 
 # The two-model approach might not make sense for proportional hazards: the baseline hazard is different in both models,
 # what is estimated is the difference over that baseline. 
-test_estimate_hte = function(data, method, tune_grid, fold, fold_name) {
+test_estimate_hte = function(data, method, method_name, tune_grid, fold, fold_name) {
 	training_data = data %>% 
 		filter(subject %in% fold) %>% 
 		mutate(sample_type="training")
@@ -98,25 +98,25 @@ test_estimate_hte = function(data, method, tune_grid, fold, fold_name) {
 		map(~prep_fold_data(., validation_data)) #now have a list (treat => (data, fold))
 
 	predictions = fold_data %>% # fit one model to each treatment group
-		map(~fit_model(.$data, .$index, method, tune_grid)) # returns the big matrix with all test set predictions for each treatment
-	test_estimates = fold_data %>%
-	    map(~select(.$data, subject, treatment, time, event)) %>%
-	    list(predictions) %>% 
-	    pmap(function(data, predictions) inner_join(data, predictions, by="subject")) %>%
-	    imap(function(df,name) rename_(df, .dots=setNames("pred", str_c("est_rel_risk", name, sep="_")))) %>% # df_TRUE$pred and df_FALSE$pred become (est_rel_risk_TRUE, ..._FALSE) in the same df
-	    reduce(inner_join, by=c("subject", "treatment", "time", "event", names(tune_grid))) %>% # will join on all columns... if didn't want to join on params would also have to join across methods!
-	    mutate(method=method) %>%
+		map(~fit_model(.$data, .$index, method, tune_grid)) %>% # returns the big matrix with all test set predictions for each treatment
+	    imap(function(df,name) rename_(df, .dots=setNames("pred", str_c("est_pseudo_outcome", name, sep="_")))) %>% # df_TRUE$pred and df_FALSE$pred become (est_pseudo_outcome_TRUE, ..._FALSE) in the same df
+	    reduce(inner_join, by=c("subject", names(tune_grid))) %>% # will join on all columns... if didn't want to join on params would also have to join across methods in some far outer loop!
+	    mutate(method=method_name) %>%
 	    unite_("model", c("method", names(tune_grid)), sep="~") %>% 
-	    mutate(fold=fold_name) %>%
-	    mutate(est_effect=est_rel_risk_TRUE-est_rel_risk_FALSE, # this is the log-relative (to the control group) risk 
-	    	   est_rel_risk=treatment*(est_rel_risk_TRUE) + (1-treatment)*est_rel_risk_FALSE) %>% # selects the estimated relative risk from the appropriate model
-	    select(subject, model, treatment, time, event, est_effect, est_rel_risk, fold) 
+	    mutate(fold=fold_name)  # selects the estimated relative risk from the appropriate model
 }
 
-cross_estimate_hte = function(data, method, tune_grid, train_index) {
+# change this so that "method" is the function that the data and options get passed to and everything else happens internally
+cross_estimate_hte = function(data, method, method_name, tune_grid, train_index) {
 	train_index %>%
-	imap(function(fold, fold_name) test_estimate_hte(data, method, tune_grid, fold, fold_name)) %>%
-	bind_rows()
+	imap(function(fold, fold_name) test_estimate_hte(data, method, method_name, tune_grid, fold, fold_name)) %>%
+	bind_rows() %>%
+	inner_join(data, by='subject') %>%
+	# putting this here might not make sense... different methods will output different "effects" 
+	# i.e. mean survival difference vs. relative risk
+    mutate(est_effect=est_pseudo_outcome_TRUE-est_pseudo_outcome_FALSE,
+    	   est_pseudo_outcome=treatment*(est_pseudo_outcome_TRUE) + (1-treatment)*est_pseudo_outcome_FALSE) %>%
+	select(subject, model, treatment, time, event, est_effect, est_pseudo_outcome, fold) 
 }
 
 
