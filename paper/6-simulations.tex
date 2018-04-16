@@ -3,7 +3,7 @@
 
 \subsection{Overview}
 
-We demonstrate the utility of these approaches using simulations. Each simulation is defined by a data-generating process with a known effect function, which allows us to compute true test set errors. Each run of each simulation generates a dataset, which we split into training and test samples. We perform $5$-fold cross validation on the training data and compute each model selection metric on each validation fold. I.e. for each training fold, we estimate $M$ different treatment effect functions $\hat\tau_m$ and for each of those we calculate each metric using the data in the corresponding validation fold. The metrics are averaged for each model across all folds. Each model selection approach then selects the model among the $M$ models that minimizes (or maximizes, when appropriate) its corresponding metric. The models selected by each approach on the basis of cross-validation are refit on the full training data and applied to the test set. The test-set treatment effect estimates of each model are compared to the known effects to calculate the true cost of using each approach for model selection. Each simulation is repeated multiple times. All of the code used to set up, run, and analyze the simulations is feely available on \href{https://github.com/som-shahlab/ITE-model-selection}{github}.
+We demonstrate the utility of these approaches using simulations. Each simulation is defined by a data-generating process with a known effect function, which allows us to compute true test set errors. Each run of each simulation generates a dataset, which we split into training and test samples. We perform $5$-fold cross validation on the training data and compute each model selection metric ($\mu$-error, $\tau$-errors, value, etc.) on each validation fold. I.e. for each training fold, we estimate $M$ different treatment effect functions $\hat\tau_m$ and for each of those we calculate each metric using the data in the corresponding validation fold. The metrics are averaged for each model across all folds. Each model selection approach then selects the model among the $M$ models that minimizes (or maximizes, when appropriate) its corresponding metric. The models selected by each approach on the basis of cross-validation are refit on the full training data and applied to the test set. The test-set treatment effect estimates of each model are compared to the known effects to calculate the true cost of using each approach for model selection. Each simulation is repeated multiple times. All of the code used to set up, run, and analyze the simulations is feely available on \href{https://github.com/som-shahlab/ITE-model-selection}{github}.
 
 \subsubsection{Data-generating processes and sampling}
 
@@ -11,7 +11,7 @@ We use the sixteen simulations from \citet{Powers:2017wd}, each of which we repe
 
 \subsubsection{Models}
 
-We fit several treatment effect models to each simulated dataset. We limit ourselves to two-model conditional mean regressions: given a model specification, we fit two separate models to predict the outcomes of the individuals who were treated and not treated and take the difference in predicted outcomes as the estimated individual treatment effect. This is so that we can calculate outcome prediction MSE as a selection metric for comparison. As a result we do not use any models that directly estimate the individual treatment effect (e.g. causal forests). The models we use are gradient boosted trees (number of trees ranging from $1$ to $500$, tree depth of $3$, shrinkage of $0.2$ and minimum $3$ individuals per node) and elastic nets ($\alpha=0.5$, $\lambda \in [e^{-5}, e^2]$). These models give us a range of high-performing linear and nonlinear models to select among. For efficiency, we only consider combinations of $\hat\mu_1$ and $\hat\mu_0$ that were fit using the same method with the same hyperparameters. This constraint need not be enforced in practice (i.e. $\hat\mu_0$ could be fit using a linear model and $\hat\mu_1$ fit using a random forest). All models are fit using the caret R package.
+We fit several treatment effect models to each simulated dataset. We limit ourselves to two-model conditional mean regressions: given a model specification, we fit two separate models to predict the outcomes of the individuals who were treated and not treated and take the difference in predicted outcomes as the estimated individual treatment effect. This is so that we can calculate $\mu$-error as a selection metric for comparison to $\tau$-errors and value. As a result we do not use any models that directly estimate the individual treatment effect (e.g. causal forests). The models we use are gradient boosted trees (number of trees ranging from $1$ to $500$, tree depth of $3$, shrinkage of $0.2$ and minimum $3$ individuals per node) and elastic nets ($\alpha=0.5$, $\lambda \in [e^{-5}, e^2]$). These models give us a range of high-performing linear and nonlinear models to select among. For efficiency, we only consider combinations of $\hat\mu_1$ and $\hat\mu_0$ that were fit using the same method with the same hyperparameters. This constraint need not be enforced in practice (i.e. $\hat\mu_0$ could be fit using a linear model and $\hat\mu_1$ fit using a random forest). All models are fit using the caret R package.
 
 \subsubsection{Model selection approaches}
 
@@ -26,21 +26,19 @@ The following metrics are used to select among models in each simulation:
 	 \hline
 	 Random & NA &  NA \\
 	 \hline
-	 Covariate matched-pairs ITE MSE & \ref{match-mse} & ITE loss \\
-	 Transformed outcome ITE MSE & \ref{match-mse} & ITE loss \\
-	 Covariate matched-pairs ITE decision cost &  \ref{sec:gain-value} & ITE loss (Value) \\
-	 Transformed outcome ITE decision cost (neg. generalized gain) &  \ref{sec:gain}, \ref{sec:gain-value} & ITE loss (Value) \\
+	 Covariate matched-pairs / MSE & \ref{match-mse} & $\tau$-error \\
+	 Transformed outcome / MSE & \ref{match-mse} & $\tau$-error \\
+	 Covariate matched-pairs / decision cost &  \ref{sec:gain-value} & $\tau$-error / value \\
+	 Transformed outcome / decision cost (neg. generalized gain) & \ref{sec:gain-value} & $\tau$-error / value \\
 	 \hline
-	 Traditional gain &  \ref{sec:gain} & Value \\ 
-	 Decision value &  \ref{sec:value} & Value \\
+	 Traditional gain &  \ref{sec:gain-value} & value \\ 
+	 Decision value &  \ref{sec:value} & value \\
 	 \hline
 	 C-for-benefit &  \ref{other} & AUC \\
 	 Qini coefficient (gain-at-k AUC) &  \ref{other} & AUC \\
 	 Value-at-k AUC &  \ref{other} & AUC \\
 	 \hline
-	 Est. treatment effect strata ITE MSE &  \ref{te-match} & Other \\
-	 \hline
-	 Outcome prediction MSE &  \ref{sec:pred-error} & Outcome loss \\
+	 Outcome prediction MSE &  \ref{sec:pred-error} & $\mu$-error \\
 	 \hline
 \end{tabu}
 \end{center}
@@ -60,43 +58,43 @@ Let the model $\hat\tau_m$ selected by optimizing metric $h$ in cross-validation
 We are interested in the quantities
 
 \[
-\tau MSE_h = E[ (\hat\tau^{*_h} (X) - \tau(X))^2 ]
+\tau MSE(\hat\tau^{*_h}) = E[ (\hat\tau^{*_h} (X) - \tau(X))^2 ]
 \]
 
 and 
 
 \[
-v_h = E[ Y| W =\hat d^{*_h} (X)]
+v(\hat\tau^{*_h}) = E[ Y| W =\hat d^{*_h} (X)]
 \]
 
 which we unbiasedly estimate in a large test set $\mathcal{T}$ via
 
 \begin{equation}
 \label{true-mse}
-\tau MSE^{(\mathcal{T})}_h = \frac{1}{|\mathcal{T}|}\sum_{i \in \mathcal{T}} (\hat\tau^{*_h} (x_i) - \tau(x_i))^2
+\tau MSE^{(\mathcal{T})}(\hat\tau^{*_h}) = \frac{1}{|\mathcal{T}|}\sum_{i \in \mathcal{T}} (\hat\tau^{*_h} (x_i) - \tau(x_i))^2
 \end{equation}
 
 and 
 
 \begin{equation}
 \label{true-value}
-v^{(\mathcal{T})}_h = \frac{1}{|\mathcal{T}|}\sum_{i \in \mathcal{T}} \mu_{\hat d^{*_h}(x_i)}(x_i)
+v^{(\mathcal{T})}(\hat\tau^{*_h}) = \frac{1}{|\mathcal{T}|}\sum_{i \in \mathcal{T}} \mu_{\hat d^{*_h}(x_i)}(x_i)
 \end{equation}
 
 Where $\hat d^{*_h}(x_i) = I(\hat\tau^{*_h}(x_i) > 0)$ as before. 
 
-$\tau MSE_{h}^{(\mathcal{T})}$ calculates how well the selected model estimates the treatment effect for individuals in the test set. $v^{(\mathcal{T})}$ is the decision value of applying the treatment policy $\hat d(x)$ derived from each selected model $\hat \tau (x)$ to the individuals in the test set.
+$\tau MSE^{(\mathcal{T})}$ calculates how well the selected model estimates the treatment effect for individuals in the test set. $v^{(\mathcal{T})}$ is the decision value of applying the treatment policy $\hat d(x)^{*_h}$ derived from each selected model $\hat \tau^{*_h} (x)$ to the individuals in the test set.
 
 These are both useful metrics, although only the first ($\tau MSE$, sometimes called ``precision in estimating heteorgenous effects'', or PEHE) has typically been used in simulation studies. To see why the test set decision value is also important, consider two models ($A$ and $B$) that estimate the same treatment effect for all individuals, except two ($i=1$ and $i=2$). Let $\tau(x_1) = \tau(x_2) = 0.1$, i.e. both individuals would benefit from the treatment in reality. Model $A$ estimates $\hat\tau_A(x_1) = -0.1$ and $\hat\tau_A(x_2) = 0.1$. In other words, it incorrectly suggests not treating individual $1$, although the absolute difference $|\hat\tau_A(x_1)-\tau(x_1)| = 0.2$ is quite small, so it is not heavily penalized by $\tau MSE$. Model $B$ estimates $\hat\tau_B(x_1) = 0.1$ and $\hat\tau_B(x_2) = 100$. Model $B$ correctly suggests the treatment for both individuals, but the absolute difference $|\hat\tau_B(x_2)-\tau(x_2)| = 99.9$ is large and is heavily penalized by $\tau MSE$. Often, what we want is a model that correctly assigns treatment to the individuals who stand to benefit from it. Using $\tau MSE$ in this case would favor model $A$ even though it leads to the mistreatment of more individuals than model $B$ does. However, $\tau MSE$ is still a useful metric. There may be cases where a researcher is interested in the precise magnitude of the effect for each individual, perhaps so that scarce resources can be allocated most effectively. 
 
-In our simulations, we also calculate the optima of both $v^{(\mathcal{T})}$ and $MSE^{(\mathcal{T})}$ over all the computed models $\hat\tau_m \in \{\hat\tau_1 \dots \hat\tau_M\}$:
+In our simulations, we also calculate the optima of both $v^{(\mathcal{T})}$ and $\tau MSE^{(\mathcal{T})}$ over all the computed models $\hat\tau_m \in \{\hat\tau_1 \dots \hat\tau_M\}$:
 
 \[
-\tau MSE^{(\mathcal{T})}_{*} = \underset{m}{\text{min}} \ \ \frac{1}{|\mathcal{T}|}\sum_{i \in \mathcal{T}} (\hat\tau_m (x_i) - \tau(x_i))^2
+\tau MSE^{(\mathcal{T})}(\hat\tau^{*}) = \underset{m}{\text{min}} \ \ \frac{1}{|\mathcal{T}|}\sum_{i \in \mathcal{T}} (\hat\tau_m (x_i) - \tau(x_i))^2
 \]
 
 \[
-v^{(\mathcal{T})}_{*} = \underset{m}{\text{max}} \ \ \frac{1}{|\mathcal{T}|}\sum_{i \in \mathcal{T}} \mu_{\hat d_m(x_i)}(x_i)
+v^{(\mathcal{T})}(\hat\tau^{*}) = \underset{m}{\text{max}} \ \ \frac{1}{|\mathcal{T}|}\sum_{i \in \mathcal{T}} \mu_{\hat d_m(x_i)}(x_i)
 \]
 
 These quantities represent the best possible performance that any model selection method could achieve given the available models in a given simulation. We use these quantities as baselines.
@@ -134,15 +132,15 @@ The closer to zero these are, the better the performance of the model selection 
 \begin{figure}
 \centering
 \includegraphics[width=\textwidth]{value-sim-comparison}
-\caption{Test-set decision value ($v_h$) of the model selected by each approach (y-axis) in each simulation (x-axis) relative to the test-set decision value of the true best model ($v_*$), averaged over each repetition of the simulation. Selection approaches are ranked top-to-bottom by averages of this quantity taken across all simulations. Values closer to zero indicate that the model selection approach choses better models on average.}
+\caption{Test-set decision value $v^{(\mathcal T)}(\hat\tau^{*h})$ of the model selected by each approach (y-axis) in each simulation (x-axis) relative to the test-set decision value of the true best model $v^{(\mathcal T)}(\hat\tau^{*})$, averaged over each repetition of the simulation. Selection approaches are ranked top-to-bottom by averages of this quantity taken across all simulations. Values closer to zero indicate that the model selection approach choses better models on average.}
 \end{figure}
 
 \begin{figure}
 \centering
 \includegraphics[width=\textwidth]{tmse-sim-comparison}
-\caption{Test-set treatment effect mean-squared-error ($\tau MSE_h$) of the model selected by each approach (y-axis) in each simulation (x-axis) relative to the test-set  treatment effect mean-squared-error of the true best model ($\tau MSE_*$), averaged over each repetition of the simulation. Selection approaches are ranked top-to-bottom by averages of this quantity taken across all simulations. Values closer to zero indicate that the model selection approach choses better models on average.}
+\caption{Test-set treatment effect mean-squared-error $\tau MSE^{(\mathcal{T})}(\hat\tau^{h*})$ of the model selected by each approach (y-axis) in each simulation (x-axis) relative to the test-set  treatment effect mean-squared-error of the true best model $\tau MSE^{(\mathcal{T})}(\hat\tau^{*})$, averaged over each repetition of the simulation. Selection approaches are ranked top-to-bottom by averages of this quantity taken across all simulations. Values closer to zero indicate that the model selection approach choses better models on average.}
 \end{figure}
 
-ITE loss-minimizing approaches perform well, but those that employ covariate matching are notably worse off in several simulations, likely due to the difficulty of finding good covariate matches in high dimensions. All of the approaches related to value estimation perform similarly, as expected, since the metrics they are optimizing have equivalent differences in expectation (theorem \ref{gain-value}). In some simulations with biased assignment, the traditional formulation of gain does poorly where our generalized version succeeds, presumably because our formulation correctly incorporates the propensity score. Of the AUC-style approaches, the Qini coefficient performs poorly, C-for-benefit performs reasonably, and our proposed value-at-k AUC does well. Stratifying on the predicted treatment effect as described in section \ref{te-match} fares poorly, as predicted. A straightforward application of outcome prediction MSE does very well. Random model selection leads to reasonable performance in many simulations because all of the available models perform only somewhat worse than the best among them. This is reflective of real-world use where poor models or hyperparameter combinations are removed a-priori. 
+$\tau$-error approaches perform well, but those that employ covariate matching are notably worse off in several simulations, likely due to the difficulty of finding good covariate matches in high dimensions. All of the approaches related to value estimation perform similarly, as expected, since the metrics they are optimizing have equivalent differences in expectation (theorem \ref{gain-value}). In some simulations with biased assignment, the traditional formulation of gain does poorly where our generalized version succeeds, presumably because our formulation correctly incorporates the propensity score. Of the AUC-style approaches, the Qini coefficient performs poorly, C-for-benefit performs reasonably, and our proposed value-at-k AUC does well. A straightforward application of outcome prediction MSE ($\mu$-error) does well. Random model selection leads to reasonable performance in many simulations because all of the available models perform only somewhat worse than the best among them. This is reflective of real-world use where poor models or hyperparameter combinations are removed a-priori. 
 
-Relative performance between methods is similar when gauged by test-set decision value and by test-set $\tau MSE$. 
+Relative performance between methods is similar when gauged by either $v^{(\mathcal T)}$ or $\tau MSE^{(\mathcal T)}$. 

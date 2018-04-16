@@ -6,40 +6,43 @@
 #' @import Matching
 
 # from https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3079915/
-c_stat = function(est_rel_risk, time, event, treatment, IPCW=1) {
-	event_data = data.frame(est_rel_risk=est_rel_risk, time=time, event=event, treatment=treatment, IPCW=IPCW, dummy=0) %>%
+c_stat = function(est_ranking, time, event, treatment, weight=1) {
+	event_data = data.frame(est_ranking=est_ranking, time=time, event=event, treatment=treatment, weight=weight, dummy=0) %>%
 		filter(event)
-	# print(event_data)
 	ordered_data = inner_join(event_data, event_data, by="dummy") %>%
 		filter(time.x < time.y)
-		# print(ordered_data)
-	denominator = (ordered_data$IPCW.x)^2 %>% sum
+	denominator = (ordered_data$weight.x)^2 %>% sum # the ^2 is essentially because we compare two individuals (see ref 19 in paper above)
 	numerator = ordered_data %>%
-		filter(est_rel_risk.x > est_rel_risk.y) %>%
-		mutate(IPCW=IPCW.x^2) %>%
-		pull(IPCW) %>%
+		filter(est_ranking.x < est_ranking.y) %>%
+		mutate(weight=weight.x^2) %>%
+		pull(weight) %>%
 		sum()
 	return(numerator/denominator) # the higher (closer to 1) the better
 }
 
-value = function(est_effect, treatment, time, event, IPTW=1) {
-	data.frame(est_effect=est_effect, treatment=treatment, time=time, event=event, IPTW=IPTW) %>%
-		mutate(do_treat = est_effect < 0) %>% # treat if the log-relative risk is negative
-		filter(do_treat == treatment) %>% # the "lucky" individuals
+surv_mse = function(est_survival, time, event, treatment, weight=1) {
+	data.frame(est_survival=est_survival, time=time, weight=weight) %>%
+		mutate(mse = weight*(est_survival-time)^2) %>%
+		pull(mse) %>%
+		mean(na.rm=T)
+}
+
+value = function(est_treatment, time, event, treatment, weight=1) {
+	data.frame(est_effect=est_effect, treatment=treatment, time=time, event=event, weight=weight) %>%
+		filter(est_treatment == treatment) %>% # the "lucky" individuals
 		arrange(-time) %>%
-		mutate(weighted_n_alive = cumsum(IPTW)) %>%
+		mutate(weighted_n_alive = cumsum(weight)) %>%
 		arrange(time) %>%
-		mutate(km_surv = cumprod(1-(event*IPTW)/weighted_n_alive)) %>%
+		mutate(km_surv = cumprod(1-(event*weight)/weighted_n_alive)) %>%
 		mutate(dt = lead(time) - time) %>%
 		mutate(rest_mean_survival = km_surv*dt) %>%
 		pull(rest_mean_survival) %>% 
 		sum(na.rm=T) # an estimate of the restricted mean survival time of the lucky patients
 }
 
-true_value = function(est_effect, treated_mean, control_mean) {
-	do_treat = est_effect < 0 # treat if the log-relative risk is negative
-	obs_mean = do_treat*treated_mean + (1-do_treat)*control_mean
-	mean(obs_mean)
+true_value = function(est_treatment, treated_mean, control_mean) {
+	conditional_mean = est_treatment*treated_mean + (1-est_treatment)*control_mean
+	mean(conditional_mean)
 }
 
 random_metric = function(){ return(0)}

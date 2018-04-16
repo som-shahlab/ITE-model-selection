@@ -116,10 +116,10 @@ get_estimates = function(data, models, cv_index, test_index) {
 	training_data = data %>% 
 	    filter(set=="training") 
 	cv_estimates = models %>% # cross validate on CV data (ignore the test set)
-		map(~cross_estimate_hte(training_data, .$method, .$method_name, .$tune_grid, cv_index)) %>%
+		map(~cross_estimate_hte(training_data, .$method, .$tune_grid, cv_index)) %>%
 	    bind_rows() 
 	test_estimates = models %>% # now train on all CV data and test on the test set
-		map(~cross_estimate_hte(data, .$method, .$method_name, .$tune_grid, test_index)) %>% 
+		map(~cross_estimate_hte(data, .$method, .$tune_grid, test_index)) %>% 
 		bind_rows() 
 	return(list(cv_estimates=cv_estimates, test_estimates=test_estimates))
 }
@@ -130,8 +130,9 @@ compute_cv_metrics = function(estimates) {
 	    dplyr::group_by(model, fold) %>% # I do this for each fold
 	    # mutate(est_effect_test_match = est_effect_covariate_matching(treatment, outcome, subject, match),
 	    	   # est_effect_test_trans = est_effect_transformed_outcome(treatment, outcome, ip_weights)) %>%
-	    dplyr::summarize(value = value(est_effect, treatment, time, event, IPTW=est_iptw),
-	    				 c_stat = c_stat(est_pseudo_outcome, time, event, treatment, IPCW=est_ipcw),
+	    dplyr::summarize(value = value(est_treatment, time, event, treatment, weight=est_iptw),
+	    				 c_stat = c_stat(est_ranking, time, event, treatment, weight=est_ipcw),
+	    				 surv_mse = surv_mse(est_survival, time, event, treatment),
 	                     random = random_metric()
 	                     ) %>%
 	   	dplyr::ungroup() %>% dplyr::select(-fold) %>% dplyr::group_by(model) %>% # Then average over the folds
