@@ -132,7 +132,7 @@ compute_cv_metrics = function(estimates) {
 	    	   # est_effect_test_trans = est_effect_transformed_outcome(treatment, outcome, ip_weights)) %>%
 	    dplyr::summarize(value = value(est_treatment, time, event, treatment, weight=est_iptw),
 	    				 c_stat = c_stat(est_ranking, time, event, treatment, weight=est_ipcw),
-	    				 surv_mse = surv_mse(est_survival, time, event, treatment),
+	    				 # surv_mse = surv_mse(est_survival, time, event, treatment),
 	                     random = random_metric()
 	                     ) %>%
 	   	dplyr::ungroup() %>% dplyr::select(-fold) %>% dplyr::group_by(model) %>% # Then average over the folds
@@ -142,7 +142,7 @@ compute_cv_metrics = function(estimates) {
 compute_test_metrics = function(estimates) {
 	estimates  %>%
 	    dplyr::group_by(model) %>% # there should only be one fold
-	    dplyr::summarize(true_value = true_value(est_effect, treated_mean, control_mean))
+	    dplyr::summarize(true_value = true_value(est_treatment, treated_mean, control_mean))
 }
 
 #' Estimates estimated cv metrics and true test metrics (the latter via true values in aux_data). 
@@ -177,9 +177,9 @@ get_metrics = function(cv_estimates, test_estimates, aux_data) {
 		bind_rows(oracle_metrics) %>%
 	    inner_join(test_metrics, by="model") %>%
 	    bind_rows(data.frame(model="truth", selection_method="oracle",  # this is the true model
-	    					 true_value=(aux_data %>% filter(set=="test") %$% true_value(-effect, treated_mean, control_mean)))) %>% 
+	    					 true_value=(aux_data %>% filter(set=="test") %$% true_value(opt_treatment, treated_mean, control_mean)))) %>% 
 	    bind_rows(data.frame(model="harm", selection_method="demon",  # this is the true "evil" model
-	    					 true_value=(aux_data %>% filter(set=="test") %$% true_value(effect, treated_mean, control_mean)))) 
+	    					 true_value=(aux_data %>% filter(set=="test") %$% true_value(!opt_treatment, treated_mean, control_mean)))) 
 	    # mutate(optimal_deficiency = -true_hte_value(true_effect, true_effect, true_mean)) # %>%
 	    # mutate(scenario=scenario, n_folds=n_folds, training_percent=training_percent, rep=rep)
 	return(list(cv_metrics=cv_metrics, test_metrics=test_metrics, true_selection_metrics=true_selection_metrics))

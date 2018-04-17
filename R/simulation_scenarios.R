@@ -103,6 +103,7 @@ create_data = function(DGP, n=1) {
         treated_mean=mu1, 
         control_mean=mu0, 
         effect=tau,
+        opt_treatment = tau>0,
         iptw=1/(1-w + 2*w*pw - pw),
         ipcw=1/pc)
 

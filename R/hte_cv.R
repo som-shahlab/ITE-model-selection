@@ -28,7 +28,7 @@ surv_mse = function(est_survival, time, event, treatment, weight=1) {
 }
 
 value = function(est_treatment, time, event, treatment, weight=1) {
-	data.frame(est_effect=est_effect, treatment=treatment, time=time, event=event, weight=weight) %>%
+	data.frame(est_treatment=est_treatment, treatment=treatment, time=time, event=event, weight=weight) %>%
 		filter(est_treatment == treatment) %>% # the "lucky" individuals
 		arrange(-time) %>%
 		mutate(weighted_n_alive = cumsum(weight)) %>%
