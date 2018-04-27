@@ -1,10 +1,3 @@
-#' @import dplyr
-#' @import purrr
-#' @import tidyr
-#' @import magrittr
-#' @import stringr
-#' @import caret
-#' @import Matching
 #' @import distr
 #' @import distrEx
 

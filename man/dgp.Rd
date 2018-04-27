@@ -4,18 +4,16 @@
 \alias{dgp}
 \title{Generate simulated observational data}
 \usage{
-dgp(covariate_fun, propensity_fun, mean_fun, effect_fun, sigma)
+dgp()
 }
 \arguments{
-\item{covariate_fun}{a function that randomly takes n samples from P(X)}
+\item{X}{a list of distribution objects that generate a covariate vector}
 
-\item{propensity_fun}{a vectorized function of a single vector-valued arugment x that defines E[W|X=x]}
+\item{f_W_x}{a function of x that returns the conditional distribution W|X=x}
 
-\item{mean_fun}{a vectorized function of a vector-valued arugment x that defines E[Y|X=x]}
+\item{f_Y_xw}{a function of x, w that returns the conditional distribution Y|X=x,W=w}
 
-\item{effect_fun}{a vectorized function of a single vector-valued arugment x that defines E[Y|W=1,X=x] - E[Y|W=0,X=x]}
-
-\item{sigma}{standard deviation of the normally distributed zero-mean additive noise to Y}
+\item{f_C_xw}{a function of x, w that returns the conditional distribution C|X=x,W=w}
 }
 \description{
 Generates N tuples from the joint distribution of P(X,W,Y).

@@ -1,7 +1,7 @@
-\section{Theory}
+\section{Properties of $\tau$-error and decision value}
 \label{theory}
 
-\subsection{Connection value and $\tau$-error}
+\subsection{Connecting value and $\tau$-error}
 \label{sec:gain-value}
 
 It is straightforward to see how the matching MSE and transformed outcome MSE are special cases of $\tau$-error using squared-error loss and two different estimators for $\check\tau$. Here we show that optimizing decision value also optimizes a particular $\tau$-error in expectation. To do so, we first introduce \emph{gain}, which has been previously used in the direct marketing literature to select treatment effect models. We will show that gain can be seen as a $\tau$-error and that optimizing gain is equivalent in expectation to optimizing value. 
@@ -24,7 +24,7 @@ This estimator (which we call traditional gain) is actually a special case of th
 \begin{equation}
 \label{gain}
 \begin{array}{rcl}
-	\hat g & =& \dfrac{1}{|\mathcal V |} \sum_{\mathcal{V}} \dfrac{y_i  \hat d(x_i) w_i}{p(x_i)} - \sum_{\mathcal{V}} \dfrac{y_i  \hat d(x_i) (1-w_i)}{1-p(x_i)} \\
+	\hat g & =& \dfrac{1}{|\mathcal V |} \left[ \sum_{\mathcal{V}} \dfrac{y_i  \hat d(x_i) w_i}{p(x_i)} - \sum_{\mathcal{V}} \dfrac{y_i  \hat d(x_i) (1-w_i)}{1-p(x_i)} \right] \\
 	&=& \dfrac{1}{|\mathcal V |} \sum_{\mathcal{V}} y^{\dagger}_i \hat d(x_i)
 \end{array}
 \end{equation}
@@ -39,7 +39,7 @@ To see this, we rewrite equation \ref{gain-basic} as:
 
 The multipliers underbraced above are unbiased estimates of $1/\hat p_{w_i}$ because of the conditional independence of $\hat d(X)$ and $W$. 
 
-Thus the traditional formula for gain is a version of our formula that is suitable for use when $p(x) = p$ is a constant, as is the case in randomized experiments. By and large, the direct marketing literature has focused on randomized data - to our knowledge this is the first time a gain estimator has been constructed for observational data. 
+Thus the traditional formula for gain is a version of our formula that is suitable for use when the propensity score $p(x) = p$ is a constant, as is the case in randomized experiments. By and large, the direct marketing literature has focused on randomized data - to our knowledge this is the first time a gain estimator has been constructed for observational data. 
 
 Note that gain is a special case of equation \ref{te-error} where $l(\hat \tau (x_i), \check \tau_i) = -\check \tau_i  I(\hat \tau (x_i) > 0)$ (we call this the decision cost loss) and $\check\tau_i = y_i^{\dagger}$ (the transformed outcome). Gain can thus been seen as a $\tau$-error. In our experiments we test both this $\tau$-error and  a $\tau$-error with the same loss but with the matching estimator from section \ref{match-mse} instead of the transformed outcome.
 
@@ -107,10 +107,13 @@ E\left[\frac{1}{|\mathcal{V}|}\sum_{i \in \mathcal{V}}^{|\mathcal{V}|}  (\hat \t
 \end{theorem}
 
 \begin{proof}
+
+We first pass the expectation through the sum and add and subtract $\tau$:
+
 \begin{equation}
 	E\left[ \frac{1}{|\mathcal{V}|}\sum_{i \in \mathcal{V}}^{|\mathcal{V}|}  (\hat \tau(X_i) - \check \tau_i)^2 \right]  
 	= 
-	E[ (\hat \tau(X) - \tau + \tau  - \check \tau)^2 ] \\
+	E[ ((\hat \tau(X) - \tau)  - (\check \tau-\tau))^2 ] \\
 \label{expected-plug-in-mse}
 \end{equation}
 
@@ -166,6 +169,12 @@ For losses of the form $l(\check\tau(x), \hat\tau(x)) = \check\tau(x) f(\hat\tau
 We can therefore generalize gain, using any unbiased estimator of $\tau$ instead of $y^{\dagger}$. By an argument similar to that of theorem \ref{gain-value}, maximizing any form of generalized gain will maximize value in expectation.
 
 \subsubsection{Implications}
+
+\begin{figure}
+\centering
+\includegraphics[width=0.5\textwidth]{framework}
+\caption{$\mu$-error and $\tau$-error share the same structure, but in $\mu$-error the observed outcome $y$ can be used whereas in $\tau$-error a validation-set estimate $\check\tau$ is required. In expectation, maximizing value is the same as minimizing a particular $\tau$-error.}
+\end{figure}
 
 If squared-error loss is used, only consistency in estimating a difference in generalization errors can be guaranteed, even with an unbiased estimator $\check\tau$. In other words, model selection with these approaches is not guaranteed to work (on average) unless the number of individuals in the validation set is large.
 

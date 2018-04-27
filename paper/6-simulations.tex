@@ -1,13 +1,19 @@
-\section{Simulations}
+\section{Experiments}
 \label{simulations}
 
 \subsection{Overview}
 
-We demonstrate the utility of these approaches using simulations. Each simulation is defined by a data-generating process with a known effect function, which allows us to compute true test set errors. Each run of each simulation generates a dataset, which we split into training and test samples. We perform $5$-fold cross validation on the training data and compute each model selection metric ($\mu$-error, $\tau$-errors, value, etc.) on each validation fold. I.e. for each training fold, we estimate $M$ different treatment effect functions $\hat\tau_m$ and for each of those we calculate each metric using the data in the corresponding validation fold. The metrics are averaged for each model across all folds. Each model selection approach then selects the model among the $M$ models that minimizes (or maximizes, when appropriate) its corresponding metric. The models selected by each approach on the basis of cross-validation are refit on the full training data and applied to the test set. The test-set treatment effect estimates of each model are compared to the known effects to calculate the true cost of using each approach for model selection. Each simulation is repeated multiple times. All of the code used to set up, run, and analyze the simulations is feely available on \href{https://github.com/som-shahlab/ITE-model-selection}{github}.
+We demonstrate the utility of these approaches using simulations. Each simulation is defined by a data-generating process with a known effect function, which allows us to compute true test set errors. Each run of each simulation generates a dataset, which we split into training and test samples. We perform $5$-fold cross validation on the training data and compute each model selection metric ($\mu$-error, $\tau$-errors, value, etc.) on each validation fold. I.e. for each training fold, we estimate $M$ different treatment effect functions $\hat\tau_m$ and for each of those we calculate each metric using the data in the corresponding validation fold. The metrics are averaged for each model across all folds. Each model selection approach then selects the model among the $M$ models that minimizes (or maximizes, when appropriate) its corresponding metric. The models selected by each approach on the basis of cross-validation are refit on the full training data and applied to the test set. The test-set treatment effect estimates of each model are compared to the known effects to calculate the true cost of using each approach for model selection. Each simulation is repeated multiple times. All of the code used to set up, run, and analyze the simulations is feely available at \url{https://github.com/som-shahlab/ITE-model-selection}.
+
+\begin{figure}
+\centering
+\includegraphics[width=0.6\textwidth]{methods}
+\caption{Visual summary of our experimental evaluation of treatment effect model selection approaches. Data is generated from each data-generating process and split into training/validation ($\mathcal{T}$/$\mathcal{V}$) and test samples $\mathcal{S}$. Several putative individual treatment effect models are fit on the training data. Selection metrics are calculated for each model using the validation data, and the best-performing model is selected according to each metric. Each selected model is evaluated on the test data using the known effects, which are not observed in practice.}
+\end{figure}
 
 \subsubsection{Data-generating processes and sampling}
 
-We use the sixteen simulations from \citet{Powers:2017wd}, each of which we repeat $50$ times. In each repetition, $1000$ samples are used for training and validation and $2000$ are used for testing. 
+We use the sixteen simulations from \citet{Powers:2017wd}, each of which we repeat $50$ times. In each repetition, $1000$ samples are used for training and validation and $2000$ are used for testing. Using smaller or larger sizes for the training and validation set did not substantially change our result. A large number of samples are used for testing to minimize variance in the final test set errors. 
 
 \subsubsection{Models}
 
@@ -17,14 +23,12 @@ We fit several treatment effect models to each simulated dataset. We limit ourse
 
 The following metrics are used to select among models in each simulation:
 
-% This table is terrible. Need to 1) get Type to be multicolumn 2) fix vertical spacing b/t lines 3) make Ref section much thinner
-
 \begin{center}
 \begin{tabu}{|m{6cm}|c|c|}
 	\hline
 	 \rowfont[c]{\bfseries} Metric & Reference section & Type \\
 	 \hline
-	 Random & NA &  NA \\
+	 Outcome prediction MSE &  \ref{sec:pred-error} & $\mu$-error \\
 	 \hline
 	 Covariate matched-pairs / MSE & \ref{match-mse} & $\tau$-error \\
 	 Transformed outcome / MSE & \ref{match-mse} & $\tau$-error \\
@@ -38,7 +42,7 @@ The following metrics are used to select among models in each simulation:
 	 Qini coefficient (gain-at-k AUC) &  \ref{other} & AUC \\
 	 Value-at-k AUC &  \ref{other} & AUC \\
 	 \hline
-	 Outcome prediction MSE &  \ref{sec:pred-error} & $\mu$-error \\
+	 Random & NA &  NA \\
 	 \hline
 \end{tabu}
 \end{center}

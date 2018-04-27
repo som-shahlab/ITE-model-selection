@@ -1,9 +1,3 @@
-#' @import dplyr
-#' @import purrr
-#' @import tidyr
-#' @import magrittr
-#' @import caret
-#' @import Matching
 
 # from https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3079915/
 c_stat = function(est_ranking, time, event, treatment, weight=1) {
@@ -21,10 +15,7 @@ c_stat = function(est_ranking, time, event, treatment, weight=1) {
 }
 
 surv_mse = function(est_survival, time, event, treatment, weight=1) {
-	data.frame(est_survival=est_survival, time=time, weight=weight) %>%
-		mutate(mse = weight*(est_survival-time)^2) %>%
-		pull(mse) %>%
-		mean(na.rm=T)
+	mean(weight*(est_survival-time)^2, na.rm=T)
 }
 
 value = function(est_treatment, time, event, treatment, weight=1) {

@@ -1,9 +1,14 @@
+#' @import caret
 #' @import dplyr
 #' @import purrr
 #' @import tidyr
+#' @import stringr
 #' @import magrittr
-#' @import caret
 #' @import Matching
+
+# detach("package:plyr", unload=TRUE)
+
+make_matrix = function(x) stats::model.matrix(~.-1, x)
 
 # group data into all test folds
 # for each test fold, do the internal matching
@@ -19,25 +24,35 @@ find_matches = function(data) {
 			   match = data$subject[c(treated_match$index.control, control_match$index.control)]) # their matches
 }
 
+#' @export
 create_cv_index = function(data, n_folds=5) {
-		createFolds(data$treatment, k=n_folds) %>% # hold-out indices
+	data %>%
+		mutate(grouping = interaction(as.factor(treatment), as.factor(event))) %$%
+		createFolds(grouping, k=n_folds) %>% # hold-out indices
     	map(~(data$subject)[-.]) #  complement of each index, in terms of the subject IDs
 }
 
+truncate = function(weights, min=0.05, max=0.95) {
+	data.frame(weights=weights) %>% 
+		mutate(truncated_weights = ifelse(weights > quantile(weights, max), quantile(weights, max), weights),
+			   truncated_weights = ifelse(weights < quantile(weights, min), quantile(weights, min), truncated_weights)) %>%
+		pull(truncated_weights)
+}
 
 # see:
 # Fewell, Z., Hernán, M. A., Wolfe, F., Tilling, K., Stata, H. C., 2004. (n.d.). Controlling for time-dependent confounding using marginal structural models. Pdfs.Semanticscholar.org
 # Rodriguez, G. (2014). Survival Models. In Lecture Notes on Generalized Linear Models (pp. 1–34).
-ipcw = function(data, n_time_intervals=10) {
+#' @export
+ipcw = function(data, n_time_intervals=10, min=0.05, max=0.95) {
 	interval_data = data %>% 
 	    mutate(event = !event) %>% # "event" is now censoring, not death
 	    mutate(event_interval = ntile(time, n_time_intervals))
 	pseudo_data = list(subject = interval_data %$% unique(subject), 
                    interval = interval_data %$% unique(event_interval)) %>%
-    cross_df %>%
-    inner_join(interval_data, by="subject") %>%
-    filter(interval <= event_interval) %>% # keep only pseudo-observations before or at event time
-    mutate(event = ifelse(interval==event_interval, event, FALSE)) # before the real time of censoring, set censoring=F
+	    cross_df %>%
+	    inner_join(interval_data, by="subject") %>%
+	    filter(interval <= event_interval) %>% # keep only pseudo-observations before or at event time
+	    mutate(event = ifelse(interval==event_interval, event, FALSE)) # before the real time of censoring, set censoring=F
     pCt_XW = glm.fit( # no global intercept
 	    x = pseudo_data %>% 
 	            select(subject, interval, treatment, starts_with("covariate")) %>% 
@@ -45,23 +60,37 @@ ipcw = function(data, n_time_intervals=10) {
 	            mutate(trash=1) %>%
 	            spread(interval, trash, fill=0) %>% # give each interval its own intercept
 	            select(-interval_copy, -subject) %>%
-	            data.matrix(),
+	            make_matrix(),
+	    y = pseudo_data %>% pull(event),
+	    family = binomial(link="cloglog")) %$% 
+		fitted.values
+	pCt_W = glm.fit( # no global intercept
+	    x = pseudo_data %>% 
+	            select(subject, interval, treatment) %>% 
+	            mutate(interval_copy = interval) %>%
+	            mutate(trash=1) %>%
+	            spread(interval, trash, fill=0) %>% # give each interval its own intercept
+	            select(-interval_copy, -subject) %>%
+	            make_matrix(),
 	    y = pseudo_data %>% pull(event),
 	    family = binomial(link="cloglog")) %$% 
 		fitted.values
     data.frame(pCt_XW = pCt_XW,
+    		   pCt_W = pCt_W,
           	   subject = pseudo_data$subject) %>%
 	    group_by(subject) %>%
+	    # summarize(cens_prob_at_event_time = prod((1-pCt_XW)/(1-pCt_W)) %>%
 	    summarize(cens_prob_at_event_time = prod(1-pCt_XW)) %>%
 	    ungroup() %>%
-	    mutate(est_ipcw = 1/cens_prob_at_event_time) %>%
+	    mutate(est_ipcw = truncate(1/cens_prob_at_event_time, min, max)) %>%
 	    inner_join(data, by="subject") %>%
 	    select(subject, est_ipcw)
 }
 
+#' @export
 iptw = function(data) {
 	pW_X = glm.fit(
-		x = data %>% select(starts_with("covariate")) %>% as.matrix,
+		x = data %>% select(starts_with("covariate")) %>% make_matrix(),
 		y = data %>% pull("treatment"),
  		family = binomial(link="logit")) %$% 
 	fitted.values
@@ -124,6 +153,7 @@ get_estimates = function(data, models, cv_index, test_index) {
 	return(list(cv_estimates=cv_estimates, test_estimates=test_estimates))
 }
 
+#' @export
 compute_cv_metrics = function(estimates) {
 	estimates  %>%
 	    # dplyr::group_by(!!!syms(c(param_names, "fold"))) %>% # I do this for each fold

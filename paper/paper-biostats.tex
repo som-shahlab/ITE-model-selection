@@ -1,7 +1,10 @@
-\documentclass{article}
+\documentclass[oupdraft]{bio}
+
+% Add history information for the article if required
+% \history{Received August 1, 2010; revised October 1, 2010; accepted for publication November 1, 2010}
 
 % FOR ARXIV:
-\pdfoutput=1
+% \pdfoutput=1
 
 % if you need to pass options to natbib, use, e.g.:
 % \PassOptionsToPackage{numbers, compress}{natbib}
@@ -13,25 +16,25 @@
 %\usepackage[final,nonatbib]{nips_2017}
 
 % \usepackage{nips_2017}
-\usepackage[numbers]{natbib}
+% \usepackage[numbers]{natbib}
 
 
 \usepackage[utf8]{inputenc} % allow utf-8 input
 \usepackage[T1]{fontenc}    % use 8-bit T1 fonts
-\usepackage{hyperref}       % hyperlinks
+%\usepackage{hyperref}       % hyperlinks
 \usepackage{url}            % simple URL typesetting
 \usepackage{booktabs}       % professional-quality-adjusted-life-yearslity tables
 \usepackage{amsfonts}       % blackboard math symbols
 \usepackage{nicefrac}       % compact symbols for 1/2, etc.
 \usepackage{microtype}      % microtypography
-\usepackage{hyperref}
-\hypersetup{
-    colorlinks=true,
-    linkcolor=blue,
-    filecolor=magenta,      
-    urlcolor=cyan,
-    citecolor=red
-}
+% \usepackage{hyperref}
+% \hypersetup{
+%    colorlinks=true,
+%    linkcolor=blue,
+%    filecolor=magenta,      
+%    urlcolor=cyan,
+%    citecolor=red
+%}
 \usepackage{bm}
 \usepackage{tabu}
 \usepackage{comment}
@@ -46,8 +49,8 @@
 \usepackage{array}
 \usepackage[linesnumbered, lined, ruled, boxed, commentsnumbered]{algorithm2e}
 \graphicspath{{figures/}}
-\newtheorem{theorem}{Theorem}
-\newtheorem{lemma}{Lemma}
+% \newtheorem{theorem}{Theorem}
+% \newtheorem{lemma}{Lemma}
 \newcommand\independent{\protect\mathpalette{\protect\independenT}{\perp}}
 \def\independenT#1#2{\mathrel{\rlap{$#1#2$}\mkern2mu{#1#2}}}
 
@@ -55,20 +58,20 @@
 
 \title{General-purpose validation and model selection when estimating individual treatment effects}
 
-\author{Alejandro Schuler \\
-	aschuler@stanford.edu \\
-       Biomedical Informatics Research\\
-       Stanford University\\
-       Palo Alto, CA, USA 
-          \and
-     Nigam Shah \\
-     nigam@stanford.edu \\
-       Biomedical Informatics Research\\
-       Stanford University\\
-       Palo Alto, CA, USA 
-}
+\author{ALEJANDRO SCHULER$^\ast$, NIGAM SHAH\\[4pt]
+\textit{Biomedical Informatics Research, Stanford University, Palo Alto, CA, USA} \\[2pt]
+{aschuler@stanford.edu}}
+
+% Running headers of paper:
+\markboth%
+% First field is the short list of authors
+{A. Schuler and N. Shah}
+% Second field is the short title of the paper
+{General-purpose validation and model selection when estimating individual treatment effects}
 
 \maketitle
+
+\footnotetext{To whom correspondence should be addressed.}
 
 \input{0-abstract}
 
@@ -76,7 +79,6 @@
 \input{2-approaches}
 \input{3-theory}
 \input{5-other-methods}
-% \input{4-variants}
 \input{6-simulations}
 \input{7-conclusion}
 

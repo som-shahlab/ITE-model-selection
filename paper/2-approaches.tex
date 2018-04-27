@@ -1,10 +1,10 @@
-\section{Existing Approaches}
+\section{Existing Approaches: $\mu$-error, $\tau$-error, and value}
 \label{approaches}
 
 \subsection{$\mu$-error}
 \label{sec:pred-error}
 
-There are many simple examples where minimizing the mean-squared error of predicted outcomes badly fails to select the model with the most accurate treatment effect \cite{Rolling:2013kz}. Despite this, in the absence of anything better, prediction error has been used to select among treatment effect models. Assuming the treatment effect model is built by regressing the outcomes onto the covariates and treatment to obtain $\hat\mu_0$ and $\hat\mu_1$, we can estimate prediction error with
+There are many simple examples where minimizing the mean-squared error of predicted outcomes badly fails to select the model with the most accurate treatment effect \cite{Rolling:2013kz}. Despite this, prediction error can often be used to select among treatment effect models. Assuming the treatment effect model is built by regressing the outcomes onto the covariates and treatment to obtain $\hat\mu_0$ and $\hat\mu_1$, we can estimate prediction error with
 
 \begin{equation}
 	\check e = \frac{1}{|\mathcal{V}|} \sum_{i \in \mathcal{V}}^{|\mathcal{V}|}  
@@ -42,7 +42,7 @@ We have already seen that $\hat e_m = \frac{1}{|\mathcal{V}|}\sum_{i \in \mathca
 \label{te-error}
 \end{equation}
 
-Here, $\check \tau$ is a plug-in estimate of $\tau$ estimated using data in the validation set $\mathcal{V}$. We call this approach $\tau$-error estimation and it has several variants depending on what estimator $\check\tau$ and loss $l$ are used.
+Here, $\check \tau$ is a plug-in estimate of $\tau$ estimated using data in the validation set $\mathcal{V}$. We call this approach $\tau$-error estimation and it has several variants depending on what estimator $\check\tau$ and loss $l$ are used. Although we are the first to formalize this as a family of approaches, others have developed specific $\tau$-errors which we now turn our attention to.
 
 \subsubsection{Matched MSE}
 \label{match-mse}
@@ -51,20 +51,20 @@ Here, $\check \tau$ is a plug-in estimate of $\tau$ estimated using data in the 
 
 They prove under general assumptions and a squared-error loss that a more mathematically tractable version of their algorithm has selection consistency, meaning that it correctly selects the best model as the number of individuals goes to infinity. They conjecture that the practical version of the algorithm retains this property.
 
-The downsides of this approach are that Mahalanobis matching scales relatively poorly and matches become difficult to find in high-dimensional covariate spaces.
+A downside of this approach are that Mahalanobis matching scales relatively poorly and matches become difficult to find in high-dimensional covariate spaces.
 
 \subsubsection{Transformed outcome MSE}
 \label{trans-mse}
 
-Here we use the notation $Y^{(w)} = Y|(W=w)$ to denote the potential outcomes and $p(X) = E[W|X=x]$ to denote the propensity score. It has long been known that the transformed outcome 
+Here we use the notation $p_w(X) = P(W=w|X=x)$ to denote the propensity of treatment (or control). It has long been known that the transformed outcome 
 
 \begin{equation}
+\label{transformed-outcome}
 	\begin{array}{rcl}
-	Y^{\dagger}  & = & Y^{(0)} \frac{W}{p(X)} - Y^{(1)} \frac{1-W}{1-p(X)} \\
-	& = &
+	Y^{\dagger}  &=&
 	\begin{cases}
-		-\frac{Y}{1-p(X)} & \text{if} \ W=0 \\
-		\frac{Y}{p(X)} & \text{if} \ W=1\\
+		-\frac{Y}{p_0(X)} & \text{if} \ W=0 \\
+		\frac{Y}{p_1(X)} & \text{if} \ W=1\\
 	\end{cases} \\
 	\end{array}
 \end{equation}
@@ -79,7 +79,7 @@ is, on expectation under standard assumptions, the treatment effect: $E[Y^{\dagg
 
 \citet{Kapelner:3baXYEjR} and \citet{Zhao:2017wa} select among treatment effect models by comparing their estimated decision-theoretic \emph{values} instead of estimating prediction errors. Each model $\hat\tau_m(x)$ has an associated set of decision rules $\hat d_{m}(x,k) = I(\hat\tau_m(x) > k)$ which indicate which individuals should be treated if we wish to treat all individuals with expected benefit greater than $k$. Generally, $k=0$ so that all individuals who stand to benefit are treated. For notational convenience we write $\hat d_m(x) = \hat d_{m}(x,0)$. The \emph{value} of a decision policy $\hat d$ is $v = E[Y|W=\hat d(X)]$. In other words, the value is the expected outcome of an individual when all individuals are treated according to the policy $\hat d$. If larger values of the outcome are more desirable (e.g. lifespan, click-through rate, approval ratings), then the policy that maximizes the value is optimal, and vice-versa. Without loss of generality, we will assume that we are interested in maximizing value. The best possible policy, $d(x) = I(\tau(x) > 0)$, is generally unknown because we do not know the true treatment effect $\tau(x)$. 
 
-As before, we assume that estimators $\hat\tau_m$ have been previously estimated on an independent training set and we now dedicate our attention to data in the validation set $\mathcal{V}$. Somewhat remarkably, we will see that the value of a treatment effect model can be estimated without separately estimating the conditional treatment effect in the validation set.
+As before, we assume that estimators $\hat\tau_m$ have been previously estimated on an independent training set and we now dedicate our attention to data in the validation set $\mathcal{V}$. Somewhat remarkably, the value of a treatment effect model can be estimated without separately estimating the conditional treatment effect in the validation set.
 
 \citet{Kapelner:3baXYEjR} and \citet{Zhao:2017wa} propose the same validation set estimator for the value of a treatment effect model:
 
@@ -88,6 +88,10 @@ As before, we assume that estimators $\hat\tau_m$ have been previously estimated
 \hat v = \frac{1}{|\mathcal{V}|}\sum_{\mathcal{V}} \frac{y_i I(w_i=\hat d(x_i))}{p_{w_i}(x_i)}
 \end{equation}
 
-where $p_{w_i}(x_i) = P(W=w_i | X=x_i)$. This is the propensity score if $w_i = 1$ and one minus the propensity score if $w_i = 0$.
+where again $p_{w_i}(x_i) = P(W=w_i | X=x_i)$. This is the propensity score if $w_i = 1$ and one minus the propensity score if $w_i = 0$.
 
 In the randomized setting where $p_{w_i}(x_i) = 0.5$, we can imagine that two side-by-side experiments were run, one in which treatments were assigned according to the model ($W = \hat d(X)$) and one in which they were assigned according to the opposite recommendation ($W = 1 - \hat d(X)$). The data in the validation set are a concatenation of the data from these two experiments. To estimate the value of our model, we average the outcomes of individuals in the first experiment and ignore the data from the second experiment. This is essentially what the estimator in equation \ref{value} is doing. When $p_{w_i}(x_i) \ne 0.5$, we must appropriately weigh the outcomes according to the probability of treatment to accomplish the same goal. \citet{Kapelner:3baXYEjR} give a similar explanation, but omit the role of the propensity score. \citet{Zhao:2017wa} provide a short proof that $\hat v$ is unbiased for the true value $v = E[Y|W = \hat d(X)]$. 
+
+\subsection{Summary of existing approaches}
+
+We have condensed several approaches into three strategies: $\mu$-error, which assesses the outcome prediction error of the potential outcomes models, $\tau$-error, which assesses the error in estimating the individual treatment effect, and decision value, which estimates the impact of using the treatment effect model for decision-making. We will now examine some properties of these approaches and relationships among them before 
