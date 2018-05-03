@@ -160,63 +160,38 @@ R_learners_pred_test = function(training_index, x, w, y, mu_model_specs, p_model
 	learners_pred_test(training_index, x, pseudo_outcome, tau_model_specs, weights=weights)
 }
 
-couterfactual_test_obs = function(x, training_index) {
-	if (is.vector(x)) {c(x[training_index], x[-training_index], x[-training_index])}
-	else {rbind(x[training_index,], x[-training_index,], x[-training_index,])}
-}
-
 # returns predictions from multiple S-learners. 
 # Test-set predictions from each model of tau_hat (derived from each set of hyperparameter values) are returned.
 S_learners_pred_test = function(training_index, x, w, y, model_specs) {
 	N = length(y)
-	index = 1:N
-	N_val = length(index[-training_index])
-	list(x, y, index) %>% 
-	    map(~couterfactual_test_obs(., training_index)) %->%
-	    c(x_cf, y_cf, index_cf)
-	w_cf = c(w[training_index], rep(0, N_val), rep(1, N_val))
-	model_specs %>% imap(function(tune_grid, method) {
-		all_model_predictions = train(x = cbind(x_cf,(w_cf-0.5)*x_cf), y = y_cf,  
-									  method = method, tuneGrid = tune_grid,
-			  						  trControl = trainControl(method='cv', number=1, index=list(index=1:length(training_index)),
-									                      	   returnResamp="none", savePredictions="all"))$pred
-		all_model_predictions %>% 
-			mutate(couterfactual = ifelse(rowIndex <= N, "control", "treated")) %>%
-			mutate(index = index_cf[rowIndex]) %>%
-			select(-rowIndex, -obs) %>%
-			spread(couterfactual, pred) %>%
-			mutate(est_effect=treated-control, est_outcome=treated*w[index]+control*!w[index]) %>%
-			unite(model, names(tune_grid), sep="~") %>%
-			mutate(model = str_c(method, model, sep="@")) %>%
-			select(est_effect, est_outcome, index, model)
-	}) %>% bind_rows()
-}
+	all_index = 1:N
+	N_val = length(all_index[-training_index])
 
-filter_treatment_index = function(w, training_index, condition) {
-	list(index=training_index[w[training_index]==condition])
+	x_cf = rbind(x[training_index,], x[-training_index,], x[-training_index,])
+		list(y, all_index) %>% 
+	    map(~c(.[training_index], .[-training_index], .[-training_index])) %->%
+	c(y_cf, index_cf)
+	w_cf = c(w[training_index], rep(0, N_val), rep(1, N_val))
+
+	learners_pred_test(1:length(training_index), cbind(x_cf,(w_cf-0.5)*x_cf), y_cf, model_specs) %>%
+		mutate(couterfactual = ifelse(index <= N, "control", "treated")) %>%
+		mutate(index = index_cf[index]) %>%
+		spread(couterfactual, yhat) %>%
+		mutate(est_effect=treated-control, est_outcome=treated*w[index]+control*!w[index])
 }
 
 # returns predictions from multiple T-learners. 
 # The two models in each pair are constrained to have the same hyperparameters for computational feasibility
 # Test-set predictions from each model of tau_hat (derived from each set of hyperparameter values) are returned.
 T_learners_pred_test	= function(training_index, x, w, y, model_specs) {
-	model_specs %>% imap(function(tune_grid, method) {
-		list(treated=TRUE, control=FALSE) %>% imap(function(condition, counterfactual) {
-			all_model_predictions = train(x = x, y = y,  
-										  method = method, tuneGrid = tune_grid,
-				  						  trControl = trainControl(method='cv', number=1, 
-				  						  						   index=filter_treatment_index(w, training_index, condition),
-										                      	   returnResamp="none", savePredictions="all"))$pred
-			all_model_predictions %>% 
-				mutate(counterfactual = counterfactual)
-		}) %>% 
-		bind_rows %>%
-		filter(!(rowIndex %in% training_index)) %>% # each model will have predicted for subjects in the training set of the other model
-		select(-obs) %>%
-		spread(counterfactual, pred) %>%
-		mutate(est_effect=treated-control, est_outcome=treated*w[rowIndex]+control*!w[rowIndex]) %>%
-		unite(model, names(tune_grid), sep="~") %>%
-		mutate(model = str_c(method, model, sep="@")) %>%
-		select(est_effect, est_outcome, index=rowIndex, model)
-	}) %>% bind_rows()
+	list(treated=TRUE, control=FALSE) %>% imap(function(condition, counterfactual) {
+		learners_pred_test(
+			training_index[w[training_index]==condition], # filters the training index to only include subjects treated under "condition"
+			x, y, model_specs) %>%
+			mutate(counterfactual = counterfactual)
+	}) %>%
+	bind_rows() %>%
+	filter(!(index %in% training_index)) %>% # each model will have predicted for subjects in the training set of the other model
+	spread(counterfactual, yhat) %>%
+	mutate(est_effect=treated-control, est_outcome=treated*w[index]+control*!w[index]) 
 }
