@@ -64,7 +64,7 @@ create_data = function(DGP, n=1) {
     data$treatment = as.logical(W)
     data$covariates = X %>% data.frame
 
-    aux_data = data.frame(subject=data$subject, true_mean=mu, true_effect=tau, true_propensity=p)
+    aux_data = data.frame(subject=data$subject, treated_mean=mu+0.5*tau, control_mean=mu-0.5*tau, true_effect=tau, true_propensity=p)
 
     return(list(data=(data %>% data_list_to_df), aux_data=aux_data))
 }

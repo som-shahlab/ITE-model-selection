@@ -5,6 +5,12 @@
 #' @import caret
 #' @import Matching
 
+make_matrix = function(x) stats::model.matrix(~.-1, x)
+
+covariates = function(data) {
+	data %>% select(starts_with("covariates")) %>% make_matrix()
+}
+
 # group data into all test folds
 # for each test fold, do the internal matching
 # record the matched patient
@@ -33,14 +39,19 @@ create_cv_index = function(data, n_folds=5) {
 #' @keywords
 #' @export
 #' @examples
-setup_data = function(DGP, n_train, n_test, n_folds) {
-	simulation = create_data(DGP, n_train+n_test) 
-	data = simulation$data %>% 
-	    mutate(set = ifelse(subject > n_train, "test", "training"))
-	aux_data = simulation$aux_data %>%
-		mutate(set = ifelse(subject > n_train, "test", "training"))
-	# opt_value = true_value(true_effect, true_effect, true_mean)
+setup_data = function(DGP, n_train, n_val, n_test) {
+	create_data(DGP, n_train + n_val + n_test) %$% 
+		list(data, aux_data) %>% 
+	    map(~mutate(., set = cut(row_number(), breaks=c(0, n_train, n_train+n_val, n_train+n_val+n_test), labels=c("train", "val", "test"))) %->%
+	    c(data, aux_data)
 
+
+	# estimate many treatment effects models on the training set and get validation + test set estimates from each (TRAINING -> VALIDATION+TEST)
+	# cross-estimate mean outcome and propensity score using cross-validated models on the validation set and match on validation set (VALIDATION)
+	# use those auxiliary data (mean_outcome, pscore, match) and (est_outcome, est_effect) on the validation set to estimate all validation metrics (VALIDATION)
+	# apply tMSE and value to test-set estimates from all models using (true_effect) and (est_effect) (TEST)
+
+	# min/max all validation metrics to pick the best model according to each metric, get tMSE and value for each best model
 	aux_data$est_propensity = glm.fit(x = data %>% select(starts_with("covariate")) %>% as.matrix,
            							  y = data %>% pull("treatment"),
            					 		  family = binomial(link="logit")) %$% fitted.values
@@ -62,8 +73,8 @@ setup_data = function(DGP, n_train, n_test, n_folds) {
 	aux_data = aux_data %>%
 		inner_join(matches, by="subject") %>%
 		inner_join(data %>% select(subject, treatment), by='subject') %>%
-		mutate(true_ip_weights = 1/(1-treatment + 2*treatment*true_propensity - true_propensity)) %>% # evaluates to either 1/p1 (if w=1) or 1/p0 (if w=0)
-		mutate(est_ip_weights = 1/(1-treatment + 2*treatment*est_propensity - est_propensity)) %>% # evaluates to either 1/p1 (if w=1) or 1/p0 (if w=0)
+		mutate(true_iptw = 1/(1-treatment + 2*treatment*true_propensity - true_propensity)) %>% # evaluates to either 1/p1 (if w=1) or 1/p0 (if w=0)
+		mutate(est_iptw = 1/(1-treatment + 2*treatment*est_propensity - est_propensity)) %>% # evaluates to either 1/p1 (if w=1) or 1/p0 (if w=0)
 		select(-treatment)
 	return(list(data=data, aux_data=aux_data, cv_index=cv_index, test_index=test_index))
 }
@@ -99,24 +110,24 @@ compute_cv_metrics = function(estimates) {
 	    	   # est_effect_test_trans = est_effect_transformed_outcome(treatment, outcome, ip_weights)) %>%
 	    dplyr::summarize(#### framework: ###
 	    				 match_mse = est_effect_covariate_matching(treatment, outcome, subject, match) %>% loss_squared_error(est_effect),
-	    				 trans_mse = est_effect_transformed_outcome(treatment, outcome, true_ip_weights) %>% loss_squared_error(est_effect), 
-						 trans_mse_est_prop = est_effect_transformed_outcome(treatment, outcome, est_ip_weights) %>% loss_squared_error(est_effect), 
+	    				 trans_mse = est_effect_transformed_outcome(treatment, outcome, true_iptw) %>% loss_squared_error(est_effect), 
+						 trans_mse_est_prop = est_effect_transformed_outcome(treatment, outcome, est_iptw) %>% loss_squared_error(est_effect), 
 	    				 match_decision = est_effect_covariate_matching(treatment, outcome, subject, match) %>% loss_decision(est_effect),
-	    				 trans_decision = est_effect_transformed_outcome(treatment, outcome, true_ip_weights) %>% loss_decision(est_effect), # aka gain!
-	    				 trans_decision_est_prop = est_effect_transformed_outcome(treatment, outcome, est_ip_weights) %>% loss_decision(est_effect), # aka gain!
+	    				 trans_decision = est_effect_transformed_outcome(treatment, outcome, true_iptw) %>% loss_decision(est_effect), # aka gain!
+	    				 trans_decision_est_prop = est_effect_transformed_outcome(treatment, outcome, est_iptw) %>% loss_decision(est_effect), # aka gain!
 	    				 #### value: ####
-						 value = -value(est_effect, treatment, outcome, weights=true_ip_weights),
+						 value = -value(est_effect, treatment, outcome, weights=true_iptw),
 						 gain = -gain(est_effect, treatment, outcome),
-						 value_est_prop = -value(est_effect, treatment, outcome, weights=est_ip_weights),
+						 value_est_prop = -value(est_effect, treatment, outcome, weights=est_iptw),
 						 # #### broken: ####
 	    				 prediction_error = loss_squared_error(est_outcome, outcome),
 	                     est_te_strata = est_effect_transformed_outcome(treatment, outcome, est_effect) %>% loss_squared_error(est_effect),
 	                     #### ranking: ####
 	                     c_benefit = -c_benefit(est_effect, treatment, outcome),
-	                     qini = -qini(est_effect, treatment, outcome, true_ip_weights),
-	                     qini_est_prop = -qini(est_effect, treatment, outcome, est_ip_weights),
-	                     value_auc = -value_auc(est_effect, treatment, outcome, true_ip_weights),
-	                     value_auc_est_prop = -value_auc(est_effect, treatment, outcome, est_ip_weights),
+	                     qini = -qini(est_effect, treatment, outcome, true_iptw),
+	                     qini_est_prop = -qini(est_effect, treatment, outcome, est_iptw),
+	                     value_auc = -value_auc(est_effect, treatment, outcome, true_iptw),
+	                     value_auc_est_prop = -value_auc(est_effect, treatment, outcome, est_iptw),
 	                     ### random: ####
 	                     random = random_metric()
 	                     ) %>%

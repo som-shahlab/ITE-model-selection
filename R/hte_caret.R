@@ -3,95 +3,188 @@
 #' @import tidyr
 #' @import magrittr
 #' @import caret
-#' @import Matching
 
-# setup_fitting_1_model = function(method, tune_grid=NULL, train_index) {
-# 	function(data) train(
-# 		  x = data %>% dplyr::select(treatment, starts_with("covariate")) %>% as.matrix,
-# 		  y = data$outcome,
-# 		  method = method,
-# 		  trControl = trainControl(method='cv', 
-#                                  number=length(train_index),
-# 		  						 index=train_index,
-#                                  returnResamp="all",
-#                                  savePredictions="all"),
-# 		  tuneGrid = tune_grid)
+# # returns a function that uses training data to return the expected expected values of y (real-valued or binary)
+# # given x in a test set (under different hyperparameter values)
+# # this can be used to generate different ML methods on-the-fly by passing in the method name in caret
+# # will use this to estimate the final treatment effect function for the R-learner
+# make_learner_caret = function(caret_method_name) {
+# 	function(x, y, tune_grid, training_index, weights=NULL) {
+# 		if(is.logical(y)) {y = factor(ifelse(y, "treated", "control"))}
+# 		all_model_predictions = train(x = x, y = y, weights = weights, 
+# 									  method = caret_method_name, tuneGrid = tune_grid,
+# 			  						  trControl = trainControl(method='cv', number=1, # will feed in 1 fold at a time
+# 									  						   index=list(index=training_index),
+# 									                      	   returnResamp="all", savePredictions="all", classProbs=T))$pred
+# 		if(is.factor(y)){
+# 			all_model_predictions %>% select(prediction=treated, index=rowIndex, names(tune_grid))
+# 		} else {
+# 			all_model_predictions %>% select(prediction=pred, index=rowIndex, names(tune_grid))
+# 		}
+# 		# returns df with names (estimate, row, ... ) where ... are the names of the tune grid
+# 	}
 # }
 
-# test_estimate_hte_1_model = function(data, method, tune_grid, train_index) {
-# 	fitting_function = setup_fitting_1_model(method, tune_grid, train_index)
-# 	cf_data = data %>% # must be in this order for the train index to work
-#     	mutate(treatment = !treatment)
-# 	full_data = bind_rows(data, cf_data)
-# 	models = full_data %>% fitting_function
-# 	models$pred %>% # this carries with it columns with all the values of the hyperparameters
-# 		mutate(method = method) %>%
-# 		# unite(model, -pred, -obs, -rowIndex, -Resample, sep="^") %>%
-# 		unite_("model", c("method", names(tune_grid)), sep="~") %>%
-# 		# unite(model, !!!syms(c("method", names(tune_grid))), sep="~") %>%
-# 	    mutate(cf = ifelse(rowIndex > nrow(data), "counterfactual", "factual")) %>%
-# 	    mutate(subject = ifelse(cf=="factual", rowIndex, rowIndex-nrow(data))) %>%
-# 	    select(-rowIndex, -obs) %>%
-# 	    spread(cf, pred) %>% 
-# 	    arrange(Resample, subject) %>%
-# 	    filter(!is.na(factual)) %>%
-# 	    inner_join(data %>% select(subject, treatment, outcome), by="subject") %>%
-# 	    mutate(treated=ifelse(treatment, factual, counterfactual),
-# 	           control=ifelse(treatment, counterfactual, factual),
-# 	           effect=treated-control)
-# }
-
-
-fit_model = function(data, train_index, method, tune_grid) {
-	train(
-		  x = data %>% dplyr::select(starts_with("covariate")) %>% as.matrix,
-		  y = data$outcome,
-		  method = method,
-		  trControl = trainControl(method='cv', # will feed in 1 fold at a time
-                                 number=length(train_index),
-		  						 index=train_index,
-                                 returnResamp="all",
-                                 savePredictions="all"),
-		  tuneGrid = tune_grid)
+# takes a list of fit caret models (hyperparams already optimized by caret), returns the one with lowest RMSE
+pick_model = function(models, metric, opt=min) {
+	if(length(models)==1) {
+		return(models[[1]])
+	} else {
+		best_model_name = resamples(models)$values %>% # each row is a fold, columns are (model x metric)
+		    gather(model_metric, value, -Resample) %>% 
+		    separate(model_metric, c("model","metric"), sep="~") %>%
+		    filter(metric==metric) %>%
+		    group_by(model) %>%
+		    summarize(mean_value = mean(as.numeric(value), na.rm=T)) %>% # as.numeric in case of weird things because of NAs
+		    filter(mean_value==opt(mean_value)) %>%
+		    pull(model) %>% first() # in case of ties
+		return(models[[best_model_name]])
+	}
 }
 
-prep_fold_data = function(training_data, test_data) {
-	data = bind_rows(training_data, test_data) %>%
-		mutate(rowIndex=row_number())
-	index = list(c(data %>% 
-					filter(sample_type=="training") %>% 
-					pull(rowIndex)))
-	return(list(data=data, index=index))
+# this function only returns the test-set predictions from the model determined best via internal k-fold cross-validation
+# to be used to cross-estimate mu and p on the true validation set
+cv_learner = function(x, y, model_specs, weights=NULL, k_folds=5) {
+	if(is.logical(y)) {y = factor(ifelse(y, "treated", "control"))}
+	best_models = model_specs %>% imap(function(tune_grid, method) {
+		set.seed(1)
+		train(x = x, y = y, weights = weights, 
+		  	  method = method, tuneGrid = tune_grid,
+			  trControl = trainControl(method='cv', number=k_folds,
+                      	   returnResamp="final", savePredictions="final", classProbs=T,
+                      	   verbose=F))
+	})
+	if(is.factor(y)){
+		best_model = pick_model(best_models, "Accuracy", max)
+	} else {
+		best_model = pick_model(best_models, "RMSE", min)
+	}
 }
 
-test_estimate_hte = function(data, method, tune_grid, fold, fold_name) {
-	training_data = data[fold,] %>% mutate(sample_type="training")
-	test_data = data[-fold,] %>% mutate(sample_type="test")
-
-	fold_data = training_data %>% 
-		split(.$treatment) %>%
-		map(~prep_fold_data(., test_data)) #now have a list (treat => (data, fold))
-	predictions = fold_data %>%
-		map(~fit_model(.$data, .$index, method, tune_grid)$pred) # returns the big matrix with all test set predictions for each treatment
-	test_estimates = fold_data %>%
-	    map(~select(.$data, subject, treatment, outcome, rowIndex)) %>%
-	    list(predictions) %>%
-	    pmap(function(data, predictions) inner_join(data, predictions, by="rowIndex")) %>%
-	    imap(function(df,name) rename_(df, .dots=setNames("pred", str_c("est_outcome", name, sep="_")))) %>%
-	    reduce(inner_join, by=c("subject", "treatment", "outcome", names(tune_grid))) %>% # will join on all columns... if didn't want to join on params would also have to join across methods!
-	    mutate(method=method) %>%
-	    unite_("model", c("method", names(tune_grid)), sep="~") %>% 
-	    mutate(fold=fold_name) %>%
-	    mutate(est_effect=est_outcome_TRUE-est_outcome_FALSE, 
-	    	   est_outcome=treatment*(est_outcome_TRUE) + (1-treatment)*est_outcome_FALSE) %>%
-	    select(subject, model, treatment, outcome, est_effect, est_outcome, fold) 
+# model specs should be a list, each element of which is a list(method, tune_grid)
+cross_validated_cross_estimation = function(x, y, model_specs, weights=NULL, k_folds_cv=3, k_folds_ce=5) {
+	set.seed(1)
+	test_indices = createFolds(y, k=k_folds_ce) 
+	test_indices %>% map(function(test_index) {
+		model = cv_learner(x[-test_index,], y[-test_index], model_specs, weights=weights, k_folds=k_folds_cv) 
+		if(is.logical(y)) {
+			predict(model, newdata=x[test_index,], type="prob") %>%
+			data.frame(cross_estimate = .$treated, index=test_index)
+		} else {
+			predict(model, newdata=x[test_index,]) %>%
+			data.frame(cross_estimate = ., index=test_index)
+		}
+	}) %>% bind_rows %>% arrange(index) %>% pull(cross_estimate)
 }
 
-cross_estimate_hte = function(data, method, tune_grid, train_index) {
-	train_index %>%
-	imap(function(fold, fold_name) test_estimate_hte(data, method, tune_grid, fold, fold_name)) %>%
-	bind_rows()
+# https://topepo.github.io/caret/model-training-and-tuning.html#alternate-performance-metrics
+wRMSE = function(data, lev=NULL, model=NULL) {
+	c(wRMSE = data%$%sqrt(sum(weights*(obs-pred)^2)/sum(weights)))
+} # not sure why using this makes it weird
+
+# returns a fit R-learner model object. mu_hat and p_hat are cross-validatedly cross-estimated, then fixed.
+# The hyperparameters of the tau_hat model are selected with cross-validation and is refit to the full data
+R_learner_cv = function(x, w, y, mu_model_specs, p_model_specs, tau_model_specs, k_folds_cv=3, k_folds_ce=5) {
+	mu_hat = cross_validated_cross_estimation(x, y, mu_model_specs, 
+											  k_folds_cv=k_folds_cv, k_folds_ce=k_folds_ce)
+	p_hat = cross_validated_cross_estimation(x, w, p_model_specs, 
+											 k_folds_cv=k_folds_cv, k_folds_ce=k_folds_ce)
+
+	pseudo_outcome = (y - mu_hat)/(w - p_hat)
+	weights = (w - p_hat)^2
+	
+	tau_model_specs %>% imap(function(tune_grid, method) {
+		set.seed(1)
+		train(x = x, y = pseudo_outcome, weights = weights, 
+			  method = method, tuneGrid = tune_grid, metric="wRMSE", maximize=F,
+			  trControl = trainControl(method='cv', number=k_folds_cv,
+		                      	   returnResamp="all", savePredictions="final",
+		                      	   summaryFunction=wRMSE
+		                      	   ))
+	}) %>% pick_model("wRMSE", min) 
 }
 
-# methods = list("xgbTree", "lm")
-# tune_grids = list(expand.grid(nrounds = 1:150, max_depth = 2, eta = 0.1), NULL)
+# returns predictions from multiple R-learners. mu_hat and p_hat are cross-validatedly cross-estimated, then fixed.
+# Test-set predictions from each model of tau_hat (derived from each set of hyperparameter values) are returned.
+R_learners_pred_test = function(training_index, x, w, y, mu_model_specs, p_model_specs, tau_model_specs, k_folds_cv=3, k_folds_ce=5, default_weight=0) {
+	mu_hat = cross_validated_cross_estimation(x[training_index,], y[training_index], mu_model_specs, 
+											  k_folds_cv=k_folds_cv, k_folds_ce=k_folds_ce)
+	p_hat = cross_validated_cross_estimation(x[training_index,], w[training_index], p_model_specs, 
+											 k_folds_cv=k_folds_cv, k_folds_ce=k_folds_ce)
+	pseudo_outcome = rep(default_weight,length(y)) # the default weight changes nothing. It is mutable for testing purposes.
+	pseudo_outcome[training_index] = (y[training_index] - mu_hat)/(w[training_index] - p_hat)
+	weights = rep(default_weight, length(w))
+	weights[training_index] = (w[training_index] - p_hat)^2
+
+	tau_model_specs %>% imap(function(tune_grid, method) {
+		train(x = x, y = pseudo_outcome, weights = weights, 
+			  method = method, tuneGrid = tune_grid,
+			  trControl = trainControl(method='cv', number=1, index=list(index=training_index), # use the training data and predict on the test/validation data
+		                      	   returnResamp="none", savePredictions="all")) %$%
+		pred %>%
+		unite(model, names(tune_grid), sep="~") %>%
+		mutate(model = str_c(method, model, sep="@")) %>%
+		select(est_effect=pred, index=rowIndex, model)
+	}) %>% bind_rows()
+}
+
+organize_data_S_learner_caret = function(x, training_index) {
+	if (is.vector(x)) {c(x[training_index], x[-training_index], x[-training_index])}
+	else {rbind(x[training_index,], x[-training_index,], x[-training_index,])}
+}
+
+# returns predictions from multiple S-learners. 
+# Test-set predictions from each model of tau_hat (derived from each set of hyperparameter values) are returned.
+S_learners_pred_test = function(training_index, x, w, y, model_specs) {
+	N = length(y)
+	index = 1:N
+	N_val = length(index[-training_index])
+	list(x, y, index) %>% 
+	    map(~organize_data_S_learner_caret(., training_index)) %->%
+	    c(x_cf, y_cf, index_cf)
+	w_cf = c(w[training_index], rep(0, N_val), rep(1, N_val))
+	model_specs %>% imap(function(tune_grid, method) {
+		all_model_predictions = train(x = cbind(x_cf,w_cf), y = y_cf,  
+									  method = method, tuneGrid = tune_grid,
+			  						  trControl = trainControl(method='cv', number=1, index=list(index=1:length(training_index)),
+									                      	   returnResamp="none", savePredictions="all"))$pred
+		all_model_predictions %>% 
+			mutate(couterfactual = ifelse(rowIndex <= N, "control", "treated")) %>%
+			mutate(index = index_cf[rowIndex]) %>%
+			select(-rowIndex, -obs) %>%
+			spread(couterfactual, pred) %>%
+			mutate(est_effect=treated-control, est_outcome=treated*w[index]+control*!w[index]) %>%
+			unite(model, names(tune_grid), sep="~") %>%
+			mutate(model = str_c(method, model, sep="@")) %>%
+			select(est_effect, est_outcome, index, model)
+	}) %>% bind_rows()
+}
+
+filter_treatment_index = function(w, training_index, condition) {
+	list(index=training_index[w[training_index]==condition])
+}
+
+# returns predictions from multiple T-learners. 
+# The two models in each pair are constrained to have the same hyperparameters for computational feasibility
+# Test-set predictions from each model of tau_hat (derived from each set of hyperparameter values) are returned.
+T_learners_pred_test	= function(training_index, x, w, y, model_specs) {
+	model_specs %>% imap(function(tune_grid, method) {
+		list(treated=TRUE, control=FALSE) %>% imap(function(condition, counterfactual) {
+			all_model_predictions = train(x = x, y = y,  
+										  method = method, tuneGrid = tune_grid,
+				  						  trControl = trainControl(method='cv', number=1, 
+				  						  						   index=filter_treatment_index(w, training_index, condition),
+										                      	   returnResamp="none", savePredictions="all"))$pred
+			all_model_predictions %>% 
+				mutate(counterfactual = counterfactual)
+		}) %>% 
+		bind_rows %>%
+		filter(!(rowIndex %in% training_index)) %>% # each model will have predicted for subjects in the training set of the other model
+		select(-obs) %>%
+		spread(counterfactual, pred) %>%
+		mutate(est_effect=treated-control, est_outcome=treated*w[rowIndex]+control*!w[rowIndex]) %>%
+		unite(model, names(tune_grid), sep="~") %>%
+		mutate(model = str_c(method, model, sep="@")) %>%
+		select(est_effect, est_outcome, index=rowIndex, model)
+	}) %>% bind_rows()
+}
