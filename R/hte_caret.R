@@ -98,7 +98,7 @@ R_learner_cv = function(x, w, y, mu_model_specs, p_model_specs, tau_model_specs,
 		train(x = x, y = pseudo_outcome, weights = weights, 
 			  method = method, tuneGrid = tune_grid, metric="wRMSE", maximize=F,
 			  trControl = trainControl(method='cv', number=k_folds_cv,
-		                      	   returnResamp="all", savePredictions="final",
+		                      	   returnResamp="final", savePredictions="final",
 		                      	   summaryFunction=wRMSE
 		                      	   ))
 	}) %>% pick_model("wRMSE", min) 
