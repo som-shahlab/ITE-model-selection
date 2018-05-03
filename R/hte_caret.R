@@ -128,7 +128,7 @@ R_learners_pred_test = function(training_index, x, w, y, mu_model_specs, p_model
 	}) %>% bind_rows()
 }
 
-organize_data_S_learner_caret = function(x, training_index) {
+couterfactual_test_obs = function(x, training_index) {
 	if (is.vector(x)) {c(x[training_index], x[-training_index], x[-training_index])}
 	else {rbind(x[training_index,], x[-training_index,], x[-training_index,])}
 }
@@ -140,11 +140,11 @@ S_learners_pred_test = function(training_index, x, w, y, model_specs) {
 	index = 1:N
 	N_val = length(index[-training_index])
 	list(x, y, index) %>% 
-	    map(~organize_data_S_learner_caret(., training_index)) %->%
+	    map(~couterfactual_test_obs(., training_index)) %->%
 	    c(x_cf, y_cf, index_cf)
 	w_cf = c(w[training_index], rep(0, N_val), rep(1, N_val))
 	model_specs %>% imap(function(tune_grid, method) {
-		all_model_predictions = train(x = cbind(x_cf,w_cf), y = y_cf,  
+		all_model_predictions = train(x = cbind(x_cf,(w_cf-0.5)*x_cf), y = y_cf,  
 									  method = method, tuneGrid = tune_grid,
 			  						  trControl = trainControl(method='cv', number=1, index=list(index=1:length(training_index)),
 									                      	   returnResamp="none", savePredictions="all"))$pred
