@@ -25,18 +25,33 @@
 # 	}
 # }
 
-# takes a list of fit caret models (hyperparams already optimized by caret), returns the one with lowest RMSE
-pick_model = function(models, metric, opt=min) {
+# https://topepo.github.io/caret/model-training-and-tuning.html#alternate-performance-metrics
+summary_metrics = function(data, lev=NULL, model=NULL) {
+	if (is.null(data$weights)) {
+		data %<>% mutate(weights=1)
+	}
+	data %>% select(obs, pred, weights) %->% c(obs, pred, weights) # makes sure the order is correct
+	if (!is.factor(obs) && is.numeric(obs)) {
+		c(wRMSE = sqrt(sum(weights*(obs-pred)^2)/sum(weights)))
+	} else {
+		pred = factor(pred, levels = levels(obs)) # not sure if needed, but this line is in caret::postResample
+		c(wAccuracy = sum(weights*(obs == pred))/sum(weights))
+	}
+}
+
+# takes a list of fit caret models (hyperparams already optimized by caret), returns the one with lowest wRMSE or 
+# highest wAccuracy
+pick_model = function(models) {
 	if(length(models)==1) {
 		return(models[[1]])
 	} else {
 		best_model_name = resamples(models)$values %>% # each row is a fold, columns are (model x metric)
 		    gather(model_metric, value, -Resample) %>% 
 		    separate(model_metric, c("model","metric"), sep="~") %>%
-		    filter(metric==metric) %>%
+		    # filter(metric==metric) %>% # there should only be a single metric: wRMSE or wAccuracy
 		    group_by(model) %>%
 		    summarize(mean_value = mean(as.numeric(value), na.rm=T)) %>% # as.numeric in case of weird things because of NAs
-		    filter(mean_value==opt(mean_value)) %>%
+		    filter(mean_value==ifelse(models[[1]]$maximize, max(mean_value), min(mean_value))) %>%
 		    pull(model) %>% first() # in case of ties
 		return(models[[best_model_name]])
 	}
@@ -44,29 +59,58 @@ pick_model = function(models, metric, opt=min) {
 
 # this function only returns the test-set predictions from the model determined best via internal k-fold cross-validation
 # to be used to cross-estimate mu and p on the true validation set
-cv_learner = function(x, y, model_specs, weights=NULL, k_folds=5) {
+learner_cv = function(x, y, model_specs, weights=NULL, k_folds=4) {
 	if(is.logical(y)) {y = factor(ifelse(y, "treated", "control"))}
-	best_models = model_specs %>% imap(function(tune_grid, method) {
+	model_specs %>% imap(function(settings, method) {
+		train_args = list(
+			x = x, y = y, weights = weights, 
+			metric = "wRMSE", maximize=F, # these will be changed if it is a classification problem
+			method = method, tuneGrid = settings$tune_grid,
+			trControl = trainControl(
+				summaryFunction=summary_metrics,
+				method='cv', number=k_folds,
+			  	returnResamp="final", savePredictions="final"))
+		if(is.factor(y)) {
+			train_args$trControl$classProbs=T
+			train_args$metric="wAccuracy"
+			train_args$maximize=T}
 		set.seed(1)
-		train(x = x, y = y, weights = weights, 
-		  	  method = method, tuneGrid = tune_grid,
-			  trControl = trainControl(method='cv', number=k_folds,
-                      	   returnResamp="final", savePredictions="final", classProbs=T,
-                      	   verbose=F))
-	})
-	if(is.factor(y)){
-		best_model = pick_model(best_models, "Accuracy", max)
-	} else {
-		best_model = pick_model(best_models, "RMSE", min)
-	}
+		do.call(train, c(train_args, settings$extra_args))
+	}) %>% pick_model(
+	)
 }
 
-# model specs should be a list, each element of which is a list(method, tune_grid)
-cross_validated_cross_estimation = function(x, y, model_specs, weights=NULL, k_folds_cv=3, k_folds_ce=5) {
+learners_pred_test = function(training_index, x, y, model_specs, weights=NULL) {
+	if(is.logical(y)) {y = factor(ifelse(y, "treated", "control"))}
+	model_specs %>% imap(function(settings, method) {
+		train_args = list(
+			x = x, y = y, weights = weights, 
+			metric = "wRMSE", maximize=F, # these will be changed if it is a classification problem
+			method = method, tuneGrid = settings$tune_grid,
+			trControl = trainControl(
+				summaryFunction=summary_metrics,
+				method='cv', number=1, index=list(index=training_index),
+			  	returnResamp="none", savePredictions="all"))
+		if(is.factor(y)) {
+			train_args$trControl$classProbs=T
+			train_args$metric="wAccuracy"
+			train_args$maximize=T}
+		set.seed(1)
+		trained = do.call(train, c(train_args, settings$extra_args)) 
+
+		trained$pred %>%
+		unite(model, names(settings$tune_grid), sep="~") %>%
+		mutate(model = str_c(method, model, sep="@")) %>%
+		select(yhat=pred, index=rowIndex, model)
+	}) %>% bind_rows()
+}
+
+# model specs should be a list, each element of which is a list(method=list(tune_grid, extra_args))
+cross_validated_cross_estimation = function(x, y, model_specs, weights=NULL, k_folds_cv=4, k_folds_ce=4) {
 	set.seed(1)
 	test_indices = createFolds(y, k=k_folds_ce) 
 	test_indices %>% map(function(test_index) {
-		model = cv_learner(x[-test_index,], y[-test_index], model_specs, weights=weights, k_folds=k_folds_cv) 
+		model = learner_cv(x[-test_index,], y[-test_index], model_specs, weights=weights, k_folds=k_folds_cv) 
 		if(is.logical(y)) {
 			predict(model, newdata=x[test_index,], type="prob") %>%
 			data.frame(cross_estimate = .$treated, index=test_index)
@@ -77,55 +121,43 @@ cross_validated_cross_estimation = function(x, y, model_specs, weights=NULL, k_f
 	}) %>% bind_rows %>% arrange(index) %>% pull(cross_estimate)
 }
 
-# https://topepo.github.io/caret/model-training-and-tuning.html#alternate-performance-metrics
-wRMSE = function(data, lev=NULL, model=NULL) {
-	c(wRMSE = data%$%sqrt(sum(weights*(obs-pred)^2)/sum(weights)))
-} # not sure why using this makes it weird
-
 # returns a fit R-learner model object. mu_hat and p_hat are cross-validatedly cross-estimated, then fixed.
 # The hyperparameters of the tau_hat model are selected with cross-validation and is refit to the full data
-R_learner_cv = function(x, w, y, mu_model_specs, p_model_specs, tau_model_specs, k_folds_cv=3, k_folds_ce=5) {
-	mu_hat = cross_validated_cross_estimation(x, y, mu_model_specs, 
-											  k_folds_cv=k_folds_cv, k_folds_ce=k_folds_ce)
-	p_hat = cross_validated_cross_estimation(x, w, p_model_specs, 
-											 k_folds_cv=k_folds_cv, k_folds_ce=k_folds_ce)
+R_learner_cv = function(x, w, y, mu_model_specs, p_model_specs, tau_model_specs, k_folds_cv=4, k_folds_ce=4) {
+	mu_hat = cross_validated_cross_estimation(
+		x, y, mu_model_specs, 
+		k_folds_cv=k_folds_cv, 
+		k_folds_ce=k_folds_ce)
+	p_hat = cross_validated_cross_estimation(
+		x, w, p_model_specs, 
+		k_folds_cv=k_folds_cv, 
+		k_folds_ce=k_folds_ce)
 
 	pseudo_outcome = (y - mu_hat)/(w - p_hat)
 	weights = (w - p_hat)^2
-	
-	tau_model_specs %>% imap(function(tune_grid, method) {
-		set.seed(1)
-		train(x = x, y = pseudo_outcome, weights = weights, 
-			  method = method, tuneGrid = tune_grid, metric="wRMSE", maximize=F,
-			  trControl = trainControl(method='cv', number=k_folds_cv,
-		                      	   returnResamp="final", savePredictions="final",
-		                      	   summaryFunction=wRMSE
-		                      	   ))
-	}) %>% pick_model("wRMSE", min) 
+
+	learner_cv(x, pseudo_outcome, tau_model_specs, weights=weights, k_folds=k_folds_cv)
 }
 
 # returns predictions from multiple R-learners. mu_hat and p_hat are cross-validatedly cross-estimated, then fixed.
 # Test-set predictions from each model of tau_hat (derived from each set of hyperparameter values) are returned.
-R_learners_pred_test = function(training_index, x, w, y, mu_model_specs, p_model_specs, tau_model_specs, k_folds_cv=3, k_folds_ce=5, default_weight=0) {
-	mu_hat = cross_validated_cross_estimation(x[training_index,], y[training_index], mu_model_specs, 
-											  k_folds_cv=k_folds_cv, k_folds_ce=k_folds_ce)
-	p_hat = cross_validated_cross_estimation(x[training_index,], w[training_index], p_model_specs, 
-											 k_folds_cv=k_folds_cv, k_folds_ce=k_folds_ce)
-	pseudo_outcome = rep(default_weight,length(y)) # the default weight changes nothing. It is mutable for testing purposes.
+R_learners_pred_test = function(training_index, x, w, y, mu_model_specs, p_model_specs, tau_model_specs, k_folds_cv=4, k_folds_ce=4) {
+	mu_hat = cross_validated_cross_estimation(
+		x[training_index,], y[training_index], 
+		mu_model_specs, 
+		k_folds_cv=k_folds_cv, 
+		k_folds_ce=k_folds_ce)
+	p_hat = cross_validated_cross_estimation(
+		x[training_index,], w[training_index], 
+		p_model_specs, 
+		k_folds_cv=k_folds_cv, 
+		k_folds_ce=k_folds_ce)
+
+	c(pseudo_outcome, weights) %<-% rep(list(rep(1,length(y))),2) # filler values, no impact on result (but can't be 0 to avoid caret error)
 	pseudo_outcome[training_index] = (y[training_index] - mu_hat)/(w[training_index] - p_hat)
-	weights = rep(default_weight, length(w))
 	weights[training_index] = (w[training_index] - p_hat)^2
 
-	tau_model_specs %>% imap(function(tune_grid, method) {
-		train(x = x, y = pseudo_outcome, weights = weights, 
-			  method = method, tuneGrid = tune_grid,
-			  trControl = trainControl(method='cv', number=1, index=list(index=training_index), # use the training data and predict on the test/validation data
-		                      	   returnResamp="none", savePredictions="all")) %$%
-		pred %>%
-		unite(model, names(tune_grid), sep="~") %>%
-		mutate(model = str_c(method, model, sep="@")) %>%
-		select(est_effect=pred, index=rowIndex, model)
-	}) %>% bind_rows()
+	learners_pred_test(training_index, x, pseudo_outcome, tau_model_specs, weights=weights)
 }
 
 couterfactual_test_obs = function(x, training_index) {
