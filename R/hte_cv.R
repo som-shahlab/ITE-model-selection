@@ -52,7 +52,7 @@ ip_value = function(w, y, iptw, tau_hat) sum((iptw*y)[(tau_hat > 0)==w])/length(
 bundle_ip_value = function(bundle, y_hat, tau_hat) bundle %$% ip_value(w, y, iptw, tau_hat)
 
 dml_value = function(w, y, iptw, mu0, mu1, tau_hat) {
-	gamma = mu1 - mu0 + (2*w-1)*trans_tau(w, y, iptw) - w*trans_tau(w, mu1, iptw) - (1-w)*trans_tau(w, mu0, iptw)
+	gamma = mu1 - mu0 + (2*w-1)*trans_tau(w, y, iptw) - w*trans_tau(w, mu1, iptw) + (1-w)*trans_tau(w, mu0, iptw)
 	mean((2*(tau_hat>1)-1)*gamma)
 }
 bundle_dml_value = function(bundle, y_hat, tau_hat) bundle %$% dml_value(w, y, iptw, mu0, mu1, tau_hat)
