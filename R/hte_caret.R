@@ -4,27 +4,6 @@
 #' @import magrittr
 #' @import caret
 
-# # returns a function that uses training data to return the expected expected values of y (real-valued or binary)
-# # given x in a test set (under different hyperparameter values)
-# # this can be used to generate different ML methods on-the-fly by passing in the method name in caret
-# # will use this to estimate the final treatment effect function for the R-learner
-# make_learner_caret = function(caret_method_name) {
-# 	function(x, y, tune_grid, training_index, weights=NULL) {
-# 		if(is.logical(y)) {y = factor(ifelse(y, "treated", "control"))}
-# 		all_model_predictions = train(x = x, y = y, weights = weights, 
-# 									  method = caret_method_name, tuneGrid = tune_grid,
-# 			  						  trControl = trainControl(method='cv', number=1, # will feed in 1 fold at a time
-# 									  						   index=list(index=training_index),
-# 									                      	   returnResamp="all", savePredictions="all", classProbs=T))$pred
-# 		if(is.factor(y)){
-# 			all_model_predictions %>% select(prediction=treated, index=rowIndex, names(tune_grid))
-# 		} else {
-# 			all_model_predictions %>% select(prediction=pred, index=rowIndex, names(tune_grid))
-# 		}
-# 		# returns df with names (estimate, row, ... ) where ... are the names of the tune grid
-# 	}
-# }
-
 # https://topepo.github.io/caret/model-training-and-tuning.html#alternate-performance-metrics
 summary_metrics = function(data, lev=NULL, model=NULL) {
 	if (is.null(data$weights)) {
@@ -74,7 +53,6 @@ learner_cv = function(x, y, model_specs, weights=NULL, k_folds=4) {
 			train_args$trControl$classProbs=T
 			train_args$metric="wAccuracy"
 			train_args$maximize=T}
-		set.seed(1)
 		do.call(train, c(train_args, settings$extra_args))
 	}) %>% pick_model(
 	)
@@ -95,19 +73,17 @@ learners_pred_test = function(training_index, x, y, model_specs, weights=NULL) {
 			train_args$trControl$classProbs=T
 			train_args$metric="wAccuracy"
 			train_args$maximize=T}
-		set.seed(1)
 		trained = do.call(train, c(train_args, settings$extra_args)) 
 
 		trained$pred %>%
 		unite(model, names(settings$tune_grid), sep="~") %>%
 		mutate(model = str_c(method, model, sep="@")) %>%
-		select(yhat=pred, index=rowIndex, model)
+		select(y_hat=pred, index=rowIndex, model)
 	}) %>% bind_rows()
 }
 
 # model specs should be a list, each element of which is a list(method=list(tune_grid, extra_args))
 cross_validated_cross_estimation = function(x, y, model_specs, weights=NULL, k_folds_cv=4, k_folds_ce=4) {
-	set.seed(1)
 	test_indices = createFolds(y, k=k_folds_ce) 
 	test_indices %>% map(function(test_index) {
 		model = learner_cv(x[-test_index,], y[-test_index], model_specs, weights=weights, k_folds=k_folds_cv) 
@@ -136,12 +112,12 @@ R_learner_cv = function(x, w, y, mu_model_specs, p_model_specs, tau_model_specs,
 	pseudo_outcome = (y - mu_hat)/(w - p_hat)
 	weights = (w - p_hat)^2
 
-	learner_cv(x, pseudo_outcome, tau_model_specs, weights=weights, k_folds=k_folds_cv)
+	learner_cv(x, pseudo_outcome, tau_model_specs, weights=weights, k_folds=k_folds_cv) 
 }
 
 # returns predictions from multiple R-learners. mu_hat and p_hat are cross-validatedly cross-estimated, then fixed.
 # Test-set predictions from each model of tau_hat (derived from each set of hyperparameter values) are returned.
-R_learners_pred_test = function(training_index, x, w, y, mu_model_specs, p_model_specs, tau_model_specs, k_folds_cv=4, k_folds_ce=4) {
+R_learners_pred_test_adv = function(training_index, x, w, y, mu_model_specs, p_model_specs, tau_model_specs, k_folds_cv=4, k_folds_ce=4) {
 	mu_hat = cross_validated_cross_estimation(
 		x[training_index,], y[training_index], 
 		mu_model_specs, 
@@ -157,7 +133,31 @@ R_learners_pred_test = function(training_index, x, w, y, mu_model_specs, p_model
 	pseudo_outcome[training_index] = (y[training_index] - mu_hat)/(w[training_index] - p_hat)
 	weights[training_index] = (w[training_index] - p_hat)^2
 
-	learners_pred_test(training_index, x, pseudo_outcome, tau_model_specs, weights=weights)
+	mu_hat_val = learner_cv(x[training_index,], y[training_index], model_specs, k_folds=k_folds_cv) %>%
+		predict(newdata=x[-training_index,])
+
+	learners_pred_test(training_index, x, pseudo_outcome, tau_model_specs, weights=weights) %>%
+	select(tau_hat=y_hat, model, index) %>%
+	group_by(model) %>%
+	mutate(y_hat = mu_hat_val + (2*w[-training_index]-1)*tau_hat) %>% 
+	ungroup()
+}
+
+# uses the same model spec for tau, mu and p
+R_learners_pred_test = function(training_index, x, w, y, model_specs) {
+	R_learners_pred_test_adv(training_index, x, w, y, model_specs, model_specs, model_specs)
+}
+
+S_learner_cv_ce = function(x, w, y, model_specs, k_folds_cv=4, k_folds_ce=4) {
+	test_indices = createFolds(y, k=k_folds_ce) 
+	test_indices %>% map(function(test_index) {
+		model = learner_cv(
+			cbind(x[-test_index,], (w[-test_index]-0.5)*x[-test_index,]), y[-test_index], 
+			model_specs, k_folds=k_folds_cv) 
+		list(-0.5, 0.5) %>% map(~predict(model, newdata=cbind(x[test_index,], .*x[test_index,]))) %->%
+		c(mu0_hat, mu1_hat)
+		data.frame(mu0_hat, mu1_hat, index=test_index)	
+	}) %>% bind_rows %>% arrange(index) %$% list(mu0_hat, mu1_hat)
 }
 
 # returns predictions from multiple S-learners. 
@@ -176,8 +176,9 @@ S_learners_pred_test = function(training_index, x, w, y, model_specs) {
 	learners_pred_test(1:length(training_index), cbind(x_cf,(w_cf-0.5)*x_cf), y_cf, model_specs) %>%
 		mutate(couterfactual = ifelse(index <= N, "control", "treated")) %>%
 		mutate(index = index_cf[index]) %>%
-		spread(couterfactual, yhat) %>%
-		mutate(est_effect=treated-control, est_outcome=treated*w[index]+control*!w[index])
+		spread(couterfactual, y_hat) %>%
+		mutate(tau_hat=treated-control, y_hat=treated*w[index]+control*!w[index]) %>%
+		select(tau_hat, y_hat, model, index)
 }
 
 # returns predictions from multiple T-learners. 
@@ -192,6 +193,7 @@ T_learners_pred_test	= function(training_index, x, w, y, model_specs) {
 	}) %>%
 	bind_rows() %>%
 	filter(!(index %in% training_index)) %>% # each model will have predicted for subjects in the training set of the other model
-	spread(counterfactual, yhat) %>%
-	mutate(est_effect=treated-control, est_outcome=treated*w[index]+control*!w[index]) 
+	spread(counterfactual, y_hat) %>%
+	mutate(tau_hat=treated-control, y_hat=treated*w[index]+control*!w[index]) %>%
+	select(tau_hat, y_hat, model, index)
 }

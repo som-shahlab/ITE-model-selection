@@ -6,23 +6,21 @@
 #' @import Matching
 
 make_matrix = function(x) stats::model.matrix(~.-1, x)
-
-covariates = function(data) {
-	data %>% select(starts_with("covariates")) %>% make_matrix()
-}
+covariates = function(data) data %>% dplyr::select(starts_with("covariate")) %>% make_matrix()
+treatment = function(data) data$treatment
+outcome = function(data) data$outcome
+decompose = function(data) list(covariates(data), treatment(data), outcome(data))
 
 # group data into all test folds
 # for each test fold, do the internal matching
 # record the matched patient
-find_matches = function(data) {
-	treated_match = Match(Tr=data$treatment, 
-	   					  X=data.matrix(data%>%select(starts_with("covariate"))),
-	    				  replace=T, estimand="ATT") 
-	control_match = Match(Tr=!data$treatment, # (separate so one treated doesn't get two controls ambiguously)
-	    				  X=data.matrix(data%>%select(starts_with("covariate"))),
-	    				  replace=T, estimand="ATT")
-	data.frame(subject = data$subject[c(treated_match$index.treated, control_match$index.treated)], # all subjects
-			   match = data$subject[c(treated_match$index.control, control_match$index.control)]) # their matches
+find_matches = function(w, x) {
+	index = 1:length(w)
+	treated_match = Match(Tr=w, X=x, replace=T, estimand="ATT") 
+	control_match = Match(Tr=!w, X=x, replace=T, estimand="ATT")
+	list(
+		subject = index[c(treated_match$index.treated, control_match$index.treated)], # all subjects
+		match = index[c(treated_match$index.control, control_match$index.control)]) # their matches
 }
 
 create_cv_index = function(data, n_folds=5) {
@@ -42,7 +40,10 @@ create_cv_index = function(data, n_folds=5) {
 setup_data = function(DGP, n_train, n_val, n_test) {
 	create_data(DGP, n_train + n_val + n_test) %$% 
 		list(data, aux_data) %>% 
-	    map(~mutate(., set = cut(row_number(), breaks=c(0, n_train, n_train+n_val, n_train+n_val+n_test), labels=c("train", "val", "test"))) %->%
+	    map(~mutate(., set=cut(
+	    	row_number(), 
+	    	breaks=c(0, n_train, n_train+n_val, n_train+n_val+n_test), 
+	    	labels=c("train", "val", "test"))) %->%
 	    c(data, aux_data)
 
 
