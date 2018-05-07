@@ -1,9 +1,3 @@
-#' @import dplyr
-#' @import purrr
-#' @import tidyr
-#' @import magrittr
-#' @import caret
-#' @import Matching
 
 # reverse the order of a df (sort without reordering)
 reverse_rows = function(df) df[dim(df)[1]:1,]

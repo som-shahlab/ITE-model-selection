@@ -1,8 +1,3 @@
-#' @import dplyr
-#' @import purrr
-#' @import tidyr
-#' @import magrittr
-#' @import caret
 
 # https://topepo.github.io/caret/model-training-and-tuning.html#alternate-performance-metrics
 summary_metrics = function(data, lev=NULL, model=NULL) {

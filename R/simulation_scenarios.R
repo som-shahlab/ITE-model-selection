@@ -1,24 +1,4 @@
-#' @import dplyr
-#' @import purrr
-#' @import tidyr
-#' @import magrittr
-#' @import stringr
-#' @import caret
-#' @import Matching
 
-data_list_to_df = function(data_list) {
-    data_list$covariates %<>% set_names(paste("covariate", 1:ncol(.), sep="_"))
-    data_list %$% cbind(subject, outcome, treatment, covariates) %>% data.frame
-}
-
-data_df_to_list = function(data_df) {
-    data_list = list()
-    data_list$subject = data_df %>% pull(subject)
-    data_list$outcome = data_df %>% pull(outcome)
-    data_list$treatment = data_df %>% pull(treatment)
-    data_list$covariates = as.matrix(data_df %>% select(starts_with()))
-    return(data_list)
-}
 
 #' Generate simulated observational data
 #'
@@ -49,24 +29,23 @@ dgp = function(covariate_fun, propensity_fun, mean_fun, effect_fun, sigma) {
 #' @export
 #' @examples
 create_data = function(DGP, n=1) {
-    X = DGP$covariate_fun(n)
+    x = DGP$covariate_fun(n)
 
-    mu = DGP$mean_fun(X)
-    tau = DGP$effect_fun(X)
-    p = DGP$propensity_fun(X)
+    mu = DGP$mean_fun(x)
+    tau = DGP$effect_fun(x)
+    p = DGP$propensity_fun(x)
 
-    W = rbinom(n, 1, p)
-    Y = mu + tau * (2*W - 1) / 2 + rnorm(n, 0, DGP$sigma)
+    w = rbinom(n, 1, p) %>% as.logical
+    y = mu + tau * (2*w - 1) / 2 + rnorm(n, 0, DGP$sigma)
 
-    data = list()
-    data$subject = 1:length(Y)
-    data$outcome = Y
-    data$treatment = as.logical(W)
-    data$covariates = X %>% data.frame
+    x %<>% data.frame %>% 
+        set_names(paste("covariate", 1:ncol(.), sep="_")) %>%
+        make_matrix()
 
-    aux_data = data.frame(subject=data$subject, treated_mean=mu+0.5*tau, control_mean=mu-0.5*tau, true_effect=tau, true_propensity=p)
+    mu1=mu+0.5*tau 
+    mu0=mu-0.5*tau
 
-    return(list(data=(data %>% data_list_to_df), aux_data=aux_data))
+    return(list(x=x, w=w, y=y, p=p, mu0=mu0, mu1=mu1, tau=tau))
 }
 
 x1 = function(n, p=10) {
