@@ -4,6 +4,14 @@
 #' @import Matching
 #' @import tidyverse
 
+#' @export
+make_indices = function(n_train, n_val, n_test) {
+    itrain = 1:n_train
+    ival = itrain + n_train
+    itest = ival + n_val
+    list(itrain, ival, itest)
+}
+
 # returns the index of the observation most similar to the observation in that position:
 # i.e. (1->5), (2->3), ... 
 find_matches = function(x, w) {
@@ -32,6 +40,7 @@ iptw = function(p,w) 1/(1-w + 2*w*p - p)
 
 # estimate many treatment effects models on the training set and 
 # get validation + test set estimates from each
+#' @export
 estimate_val_test = function(data, itrain, model_specs) {
     c(x, w, y, ....) %<-% data
     list(
@@ -46,6 +55,7 @@ estimate_val_test = function(data, itrain, model_specs) {
 
 # cross-estimate mean outcome and propensity score using cross-validated models 
 # on the validation set and match on validation set (VALIDATION)
+#' @export
 learn_validation_auxiliaries = function(data, ival, model_specs, randomized=F) {
     data %>% 
     subset_rows(ival) %->%
@@ -71,6 +81,7 @@ learn_validation_auxiliaries = function(data, ival, model_specs, randomized=F) {
 }
 
 # use those auxiliary data and estimates on the validation set to estimate all validation metrics
+#' @export
 estimate_val_metrics = function(estimates, val_bundle, metrics, ival) {
     val_estimates_grp = estimates %>% 
         filter(index<=max(ival)) %>%
@@ -82,6 +93,7 @@ estimate_val_metrics = function(estimates, val_bundle, metrics, ival) {
 }
 
 # apply tMSE and value to test-set estimates from all models
+#' @export
 calc_test_metrics = function(data, estimates, itest) {
     data %>% 
     subset_rows(itest) %->%

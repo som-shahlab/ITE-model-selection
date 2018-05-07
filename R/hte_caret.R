@@ -2,9 +2,9 @@
 # https://topepo.github.io/caret/model-training-and-tuning.html#alternate-performance-metrics
 summary_metrics = function(data, lev=NULL, model=NULL) {
 	if (is.null(data$weights)) {
-		data %<>% mutate(weights=1)
+		data %<>% dplyr::mutate(weights=1)
 	}
-	data %>% select(obs, pred, weights) %->% c(obs, pred, weights) # makes sure the order is correct
+	data %>% dplyr::select(obs, pred, weights) %->% c(obs, pred, weights) # makes sure the order is correct
 	if (!is.factor(obs) && is.numeric(obs)) {
 		c(wRMSE = sqrt(sum(weights*(obs-pred)^2)/sum(weights)))
 	} else {
@@ -20,13 +20,12 @@ pick_model = function(models) {
 		return(models[[1]])
 	} else {
 		best_model_name = resamples(models)$values %>% # each row is a fold, columns are (model x metric)
-		    gather(model_metric, value, -Resample) %>% 
-		    separate(model_metric, c("model","metric"), sep="~") %>%
-		    # filter(metric==metric) %>% # there should only be a single metric: wRMSE or wAccuracy
-		    group_by(model) %>%
-		    summarize(mean_value = mean(as.numeric(value), na.rm=T)) %>% # as.numeric in case of weird things because of NAs
-		    filter(mean_value==ifelse(models[[1]]$maximize, max(mean_value), min(mean_value))) %>%
-		    pull(model) %>% first() # in case of ties
+		    tidyr::gather(model_metric, value, -Resample) %>% 
+		    tidyr::separate(model_metric, c("model","metric"), sep="~") %>%
+		    dplyr::group_by(model) %>%
+		    dplyr::summarize(mean_value = mean(as.numeric(value), na.rm=T)) %>% # as.numeric in case of weird things because of NAs
+		    dplyr::filter(mean_value==ifelse(models[[1]]$maximize, max(mean_value), min(mean_value))) %>%
+		    dplyr::pull(model) %>% dplyr::first() # in case of ties
 		return(models[[best_model_name]])
 	}
 }
@@ -71,9 +70,9 @@ learners_pred_test = function(training_index, x, y, model_specs, weights=NULL) {
 		trained = do.call(train, c(train_args, settings$extra_args)) 
 
 		trained$pred %>%
-		unite(model, names(settings$tune_grid), sep="~") %>%
-		mutate(model = str_c(method, model, sep="@")) %>%
-		select(y_hat=pred, index=rowIndex, model)
+		tidyr::unite(model, names(settings$tune_grid), sep="~") %>%
+		dplyr::mutate(model = str_c(method, model, sep="@")) %>%
+		dplyr::select(y_hat=pred, index=rowIndex, model)
 	}) %>% bind_rows()
 }
 
@@ -89,7 +88,7 @@ cross_validated_cross_estimation = function(x, y, model_specs, weights=NULL, k_f
 			predict(model, newdata=x[test_index,]) %>%
 			data.frame(cross_estimate = ., index=test_index)
 		}
-	}) %>% bind_rows %>% arrange(index) %>% pull(cross_estimate)
+	}) %>% bind_rows %>% dplyr::arrange(index) %>% dplyr::pull(cross_estimate)
 }
 
 # returns a fit R-learner model object. mu_hat and p_hat are cross-validatedly cross-estimated, then fixed.
@@ -132,10 +131,10 @@ R_learners_pred_test_adv = function(training_index, x, w, y, mu_model_specs, p_m
 		predict(newdata=x[-training_index,])
 
 	learners_pred_test(training_index, x, pseudo_outcome, tau_model_specs, weights=weights) %>%
-	select(tau_hat=y_hat, model, index) %>%
-	group_by(model) %>%
-	mutate(y_hat = mu_hat_val + (2*w[-training_index]-1)*tau_hat) %>% 
-	ungroup()
+	dplyr::select(tau_hat=y_hat, model, index) %>%
+	dplyr::group_by(model) %>%
+	dplyr::mutate(y_hat = mu_hat_val + (2*w[-training_index]-1)*tau_hat) %>% 
+	dplyr::ungroup()
 }
 
 # uses the same model spec for tau, mu and p
@@ -152,7 +151,7 @@ S_learner_cv_ce = function(x, w, y, model_specs, k_folds_cv=4, k_folds_ce=4) {
 		list(-0.5, 0.5) %>% map(~predict(model, newdata=cbind(x[test_index,], .*x[test_index,]))) %->%
 		c(mu0_hat, mu1_hat)
 		data.frame(mu0_hat, mu1_hat, index=test_index)	
-	}) %>% bind_rows %>% arrange(index) %$% list(mu0_hat, mu1_hat)
+	}) %>% bind_rows %>% dplyr::arrange(index) %$% list(mu0_hat, mu1_hat)
 }
 
 # returns predictions from multiple S-learners. 
@@ -169,11 +168,11 @@ S_learners_pred_test = function(training_index, x, w, y, model_specs) {
 	w_cf = c(w[training_index], rep(0, N_val), rep(1, N_val))
 
 	learners_pred_test(1:length(training_index), cbind(x_cf,(w_cf-0.5)*x_cf), y_cf, model_specs) %>%
-		mutate(couterfactual = ifelse(index <= N, "control", "treated")) %>%
-		mutate(index = index_cf[index]) %>%
-		spread(couterfactual, y_hat) %>%
-		mutate(tau_hat=treated-control, y_hat=treated*w[index]+control*!w[index]) %>%
-		select(tau_hat, y_hat, model, index)
+		dplyr::mutate(couterfactual = ifelse(index <= N, "control", "treated")) %>%
+		dplyr::mutate(index = index_cf[index]) %>%
+		tidyr::spread(couterfactual, y_hat) %>%
+		dplyr::mutate(tau_hat=treated-control, y_hat=treated*w[index]+control*!w[index]) %>%
+		dplyr::select(tau_hat, y_hat, model, index)
 }
 
 # returns predictions from multiple T-learners. 
@@ -184,11 +183,11 @@ T_learners_pred_test	= function(training_index, x, w, y, model_specs) {
 		learners_pred_test(
 			training_index[w[training_index]==condition], # filters the training index to only include subjects treated under "condition"
 			x, y, model_specs) %>%
-			mutate(counterfactual = counterfactual)
+			dplyr::mutate(counterfactual = counterfactual)
 	}) %>%
 	bind_rows() %>%
-	filter(!(index %in% training_index)) %>% # each model will have predicted for subjects in the training set of the other model
-	spread(counterfactual, y_hat) %>%
-	mutate(tau_hat=treated-control, y_hat=treated*w[index]+control*!w[index]) %>%
-	select(tau_hat, y_hat, model, index)
+	dplyr::filter(!(index %in% training_index)) %>% # each model will have predicted for subjects in the training set of the other model
+	tidyr::spread(counterfactual, y_hat) %>%
+	dplyr::mutate(tau_hat=treated-control, y_hat=treated*w[index]+control*!w[index]) %>%
+	dplyr::select(tau_hat, y_hat, model, index)
 }

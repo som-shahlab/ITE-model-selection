@@ -4,7 +4,8 @@
 \alias{dgp}
 \title{Generate simulated observational data}
 \usage{
-dgp(covariate_fun, propensity_fun, mean_fun, effect_fun, sigma)
+dgp(covariate_fun, propensity_fun, mean_fun, effect_fun, sigma,
+  randomized = F)
 }
 \arguments{
 \item{covariate_fun}{a function that randomly takes n samples from P(X)}
@@ -16,6 +17,8 @@ dgp(covariate_fun, propensity_fun, mean_fun, effect_fun, sigma)
 \item{effect_fun}{a vectorized function of a single vector-valued arugment x that defines E[Y|W=1,X=x] - E[Y|W=0,X=x]}
 
 \item{sigma}{standard deviation of the normally distributed zero-mean additive noise to Y}
+
+\item{randomized}{do we know the true propensities?}
 }
 \description{
 Generates N tuples from the joint distribution of P(X,W,Y).

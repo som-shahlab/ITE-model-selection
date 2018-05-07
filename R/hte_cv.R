@@ -12,55 +12,76 @@ mdc = function(tau, tau_hat) -mean(tau*(tau_hat > 0))
 ######################## μ-risk ####################
 ####################################################
 
+#' @export
 mse = function(y, y_hat) mean((y_hat-y)^2)
+#' @export
 bundle_mse = function(bundle, y_hat, tau_hat) bundle %$% mse(y, y_hat)
 
+#' @export
 wmse = function(y, iptw, y_hat) sum(iptw*(y_hat-y)^2)/sum(iptw)
+#' @export
 bundle_wmse = function(bundle, y_hat, tau_hat) bundle %$% wmse(y, iptw, y_hat)
 
 ####################################################
 ######################## τ-risk ####################
 ####################################################
 
+#' @export
 r_objective = function(weight, pseudo_outcome, tau_hat) wmse(pseudo_outcome, weight, tau_hat)
+#' @export
 bundle_r_objective = function(bundle, y_hat, tau_hat) bundle %$% r_objective(weight, pseudo_outcome, tau_hat)
 
+#' @export
 match_mse = function(matches, w, y, tau_hat) match_tau(w,y,matches) %>% mse(tau_hat)
+#' @export
 bundle_match_mse = function(bundle, y_hat, tau_hat) bundle %$% match_mse(matches, w, y, tau_hat)
 
+#' @export
 trans_mse = function(w, y, iptw, tau_hat) trans_tau(w,y,iptw) %>% mse(tau_hat)
+#' @export
 bundle_trans_mse = function(bundle, y_hat, tau_hat) bundle %$% trans_mse(w, y, iptw, tau_hat)
 
+#' @export
 match_mdc = function(matches, w, y, tau_hat) match_tau(w,y,matches) %>% mdc(tau_hat)
+#' @export
 bundle_match_mdc = function(bundle, y_hat, tau_hat) bundle %$% match_mdc(matches, w, y, tau_hat)
 
 # generalized gain
+#' @export
 trans_mdc =  function(w, y, iptw, tau_hat) trans_tau(w,y,iptw) %>% mdc(tau_hat)
+#' @export
 bundle_trans_mdc = function(bundle, y_hat, tau_hat) bundle %$% trans_mdc(w, y, iptw, tau_hat)
 
 #####################################################
 ######################### value #####################
 #####################################################
 
+#' @export
 ip_value = function(w, y, iptw, tau_hat) sum((iptw*y)[(tau_hat > 0)==w])/length(w)
+#' @export
 bundle_ip_value = function(bundle, y_hat, tau_hat) bundle %$% ip_value(w, y, iptw, tau_hat)
 
+#' @export
 dml_value = function(w, y, iptw, mu0, mu1, tau_hat) {
 	gamma = mu1 - mu0 + (2*w-1)*trans_tau(w, y, iptw) - w*trans_tau(w, mu1, iptw) + (1-w)*trans_tau(w, mu0, iptw)
 	mean((2*(tau_hat>1)-1)*gamma)
 }
+#' @export
 bundle_dml_value = function(bundle, y_hat, tau_hat) bundle %$% dml_value(w, y, iptw, mu0, mu1, tau_hat)
 
 # old gain
+#' @export
 gain = function(w, y, tau_hat) {
 	d = tau_hat>0 
 	(mean(y[d & w]) - mean(y[d & !w]))*sum(d)/length(w)}
+#' @export
 bundle_gain = function(bundle, y_hat, tau_hat) bundle %$% gain(w, y, tau_hat)
 
 #####################################################
 ######################### AUC #######################
 #####################################################
 
+#' @export
 c_benefit = function(w, y, tau_hat) {
 	match = Match(Tr=w, 
 				  X=tau_hat,
@@ -74,8 +95,10 @@ c_benefit = function(w, y, tau_hat) {
 		pull(concordant) %>% 
 		mean()
 }
+#' @export
 bundle_c_benefit = function(bundle, y_hat, tau_hat) bundle %$% c_benefit(w, y, tau_hat)
 
+#' @export
 qini = function(w, y, iptw, tau_hat) {
 	weighted_y = iptw*y
 	data.frame(tau_hat, w, y) %>%
@@ -88,6 +111,7 @@ qini = function(w, y, iptw, tau_hat) {
 		filter(!is.nan(uplift)) %>%
 		sum()  
 }
+#' @export
 bundle_qini = function(bundle, y_hat, tau_hat) bundle %$% qini(w, y, iptw, tau_hat)
 
 # ip_value_auc = function(w, y, iptw, tau_hat) {
@@ -107,5 +131,7 @@ bundle_qini = function(bundle, y_hat, tau_hat) bundle %$% qini(w, y, iptw, tau_h
 ######################### Random #######################
 #####################################################
 
+#' @export
 random_metric = function() return(0)
+#' @export
 bundle_random = function(bundle, y_hat, tau_hat) random_metric()

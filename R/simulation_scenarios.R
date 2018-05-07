@@ -10,12 +10,11 @@
 #' @param effect_fun a vectorized function of a single vector-valued arugment x that defines E[Y|W=1,X=x] - E[Y|W=0,X=x]
 #' @param propensity_fun a vectorized function of a single vector-valued arugment x that defines E[W|X=x]
 #' @param sigma standard deviation of the normally distributed zero-mean additive noise to Y
-#' @keywords
+#' @param randomized do we know the true propensities?
 #' @export
-#' @examples
-dgp = function(covariate_fun, propensity_fun, mean_fun, effect_fun, sigma) {
+dgp = function(covariate_fun, propensity_fun, mean_fun, effect_fun, sigma, randomized=F) {
     list(covariate_fun=covariate_fun, mean_fun=mean_fun, propensity_fun=propensity_fun, 
-         effect_fun=effect_fun, sigma=sigma)
+         effect_fun=effect_fun, sigma=sigma, randomized=randomized)
 }
 
 #' Generate simulated observational data
@@ -25,9 +24,7 @@ dgp = function(covariate_fun, propensity_fun, mean_fun, effect_fun, sigma) {
 #' called aux_data containing true expecations conditional on X.
 #' @param DGP a data generating process, which is the list output of the dgp() function
 #' @param n the number of desired samples
-#' @keywords
 #' @export
-#' @examples
 create_data = function(DGP, n=1) {
     x = DGP$covariate_fun(n)
 
@@ -121,19 +118,20 @@ create_p_bias = function(mean_fun, effect_fun) {
 #' @export
 powers_DGPs = function() {
     unbiased_DGPs = list(
-        scenario_1 = dgp(x1, create_p_rand(), f8, f1, 1),
-        scenario_2 = dgp(x1, create_p_rand(), f5, f2, 0.25),
-        scenario_3 = dgp(x1, create_p_rand(), f4, f3, 1),
-        scenario_4 = dgp(x1, create_p_rand(), f7, f4, 0.25),
-        scenario_5 = dgp(x1, create_p_rand(), f3, f5, 1),
-        scenario_6 = dgp(x1, create_p_rand(), f1, f6, 1),
-        scenario_7 = dgp(x1, create_p_rand(), f2, f7, 4),
-        scenario_8 = dgp(x1, create_p_rand(), f6, f8, 4)
+        scenario_1 = dgp(x1, create_p_rand(), f8, f1, 1, randomized=T),
+        scenario_2 = dgp(x1, create_p_rand(), f5, f2, 0.25, randomized=T),
+        scenario_3 = dgp(x1, create_p_rand(), f4, f3, 1, randomized=T),
+        scenario_4 = dgp(x1, create_p_rand(), f7, f4, 0.25, randomized=T),
+        scenario_5 = dgp(x1, create_p_rand(), f3, f5, 1, randomized=T),
+        scenario_6 = dgp(x1, create_p_rand(), f1, f6, 1, randomized=T),
+        scenario_7 = dgp(x1, create_p_rand(), f2, f7, 4, randomized=T),
+        scenario_8 = dgp(x1, create_p_rand(), f6, f8, 4, randomized=T)
     )
     biased_DGPs = unbiased_DGPs %>%
         map(~dgp(.$covariate_fun, 
              create_p_bias(.$mean_fun, .$effect_fun), 
-             .$mean_fun, .$effect_fun, .$sigma))
+             .$mean_fun, .$effect_fun, .$sigma,
+             randomized=F))
     names(biased_DGPs) = names(unbiased_DGPs) %>% map(~str_c("biased", ., sep="_"))
     c(unbiased_DGPs, biased_DGPs)
 }
