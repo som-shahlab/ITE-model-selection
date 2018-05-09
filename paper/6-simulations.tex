@@ -7,60 +7,70 @@ We demonstrate the utility of these approaches using simulations. Each simulatio
 
 \subsubsection{Data-generating processes and sampling}
 
-We use the sixteen simulations from \citet{Powers:2017wd}, each of which we repeat $50$ times. In each repetition, $1000$ samples are used for training and validation and $2000$ are used for testing. 
+We use the sixteen simulations from \citet{Powers:2017wd}, each of which we repeat $100$ times. In each repetition, $1000$ samples are used for training ($\mathcal{T}$), $1000$ for validation ($\mathcal{V}$), and $1000$ for testing ($\mathcal{S}$). Let the data be denoted by $\{\bm y, \bm w, \bm x\} = \{[y_1 \dots y_n]^T, [w_1 \dots w_n]^T, [x_1 \dots x_n]^T\}$ where $n = |\mathcal{T}| + |\mathcal{V} | + |\mathcal{S}|$. Let $\bm y^{(\mathcal A)}$ represent $[y_i | i \in \mathcal A]$. Let the set of treated individuals be $\mathcal W_1 = \{i | w_i =1\}$ and let the set of untreated individuals be $\mathcal W_0 = \{i | w_i =0\}$.
 
 \subsubsection{Models}
 
-We fit several treatment effect models to each simulated dataset. We limit ourselves to two-model conditional mean regressions: given a model specification, we fit two separate models to predict the outcomes of the individuals who were treated and not treated and take the difference in predicted outcomes as the estimated individual treatment effect. This is so that we can calculate outcome prediction MSE as a selection metric for comparison. As a result we do not use any models that directly estimate the individual treatment effect (e.g. causal forests). The models we use are gradient boosted trees (number of trees ranging from $1$ to $500$, tree depth of $3$, shrinkage of $0.2$ and minimum $3$ individuals per node) and elastic nets ($\alpha=0.5$, $\lambda \in [e^{-5}, e^2]$). These models give us a range of high-performing linear and nonlinear models to select among. For efficiency, we only consider combinations of $\hat\mu_1$ and $\hat\mu_0$ that were fit using the same method with the same hyperparameters. This constraint need not be enforced in practice (i.e. $\hat\mu_0$ could be fit using a linear model and $\hat\mu_1$ fit using a random forest). All models are fit using the caret R package.
+We fit several treatment effect models to each simulated dataset using the S-, T- and R-learning frameworks.
 
-\subsubsection{Model selection approaches}
+\paragraph{S-learners} We fit a variety of S-learners to each simulated dataset by regressing $\bm y^{(\mathcal T)}$ onto $[\bm x^{(\mathcal T)}, \bm z^{(\mathcal T)}]$ to produce $\hat\mu(x,w)$. The term $\bm z^{(\mathcal T)}$ is determined by $z_i = ( w_i- 0.5) x_i$ and ensures that the treatment effect is not implicitly regularized \cite{Nie:2017vi}. The treatment effect is calculated as $\hat\tau(x) = \hat\mu(x,1) - \hat\mu(x,0)$. 
+
+The learning algorithms we use to fit $\hat\mu$ are gradient boosted trees (number of trees ranging from $1$ to $500$, tree depth of $3$, shrinkage of $0.2$ and minimum $3$ individuals per node) and elastic nets ($\alpha=0.5$, $\lambda \in [e^{-5}, e^2]$). These models give us a range of high-performing linear and nonlinear models to select among. We estimate a treatment effect model $\hat\tau_m(x)$ for each combination of algorithm and hyperparameters.
+
+\paragraph{T-learners} T-learners are fit by separately regressing $\bm y^{(\mathcal T \cap \mathcal W_0)}$ onto $\bm x^{(\mathcal T \cap \mathcal W_0)}$ to estimate $\hat\mu_0(x)$ and $\bm y^{(\mathcal T \cap \mathcal W_0)}$ onto $\bm x^{(\mathcal T \cap \mathcal W_0)}$ to estimate $\hat\mu_1(x)$. The treatment effect is calculated as $\hat\tau(x) = \hat\mu_1(x) - \hat\mu_0(x)$. 
+
+We use the same algorithms and hyperparameters as above to fit the models $\hat\mu_w(x)$. When estimating the various treatment effect models $\hat\tau_m(x)$, we only consider combinations of models $\hat\mu_1$ and $\hat\mu_0$ that were fit using the same algorithm with the same hyperparameters. This increases computational efficiency, but need not be done in practice (i.e. $\hat\mu_0$ could be fit using a linear model and $\hat\mu_1$ fit using a random forest). It is an appropriate simplification to make in our experiments since our focus is on model selection and not model fitting.
+
+\paragraph{R-learners} In the R-learning framework of \citet{Nie:2017vi}, treatment effect models are estimated by minimizing 
+
+\begin{equation}
+	\frac{1}{|\mathcal{T}|}\sum_{i \in \mathcal{T}}^{|\mathcal{T}|}  
+	((y_i - \hat m(x_i)) - (w_i - \hat p(x_i))t(x_i))^2
+\label{r-learner}
+\end{equation}
+
+over a space of candidate models $t(x)$. Given $\hat m(x)$ and $\hat p(x)$, this is equivalent to a weighted least-squares problem with a pseudo-outcome of $\frac{ y_i - \hat m(x_i) }{w_i - \hat p(x_i)}$ and weights of $(w_i - \hat p(x_i))^2$. As such, it can be solved using a variety of learning algorithms. 
+
+In our experiments, we estimate the quantities $\hat m(\bm x^{(\mathcal T)})$ and $\hat p(\bm x^{(\mathcal T)})$ using cross-validated cross-estimation over the training set \cite{Nie:2017vi, Wager:2016dz}. The internal cross-validation is run over estimates derived from the same combinations of algorithms and hyperpameters as used by the S- and T-learners. These estimates are then fixed and used for all R-learners. Each R-learner $\hat\tau_m(x)$ is then produced by minimizing equation \ref{r-learner} using a different learning algorithm and set of hyperparameters. We use the same combinations of algorithms and hyperpameters as used by the S- and T-learners.
+
+\subsubsection{Model selection metrics}
 
 The following metrics are used to select among models in each simulation:
 
 % This table is terrible. Need to 1) get Type to be multicolumn 2) fix vertical spacing b/t lines 3) make Ref section much thinner
 
 \begin{center}
-\begin{tabu}{|m{6cm}|c|c|}
+\tabulinesep=1mm
+\begin{tabu}{|l|c|}
 	\hline
-	 \rowfont[c]{\bfseries} Metric & Reference section & Type \\
+	 \rowfont[c]{\bfseries} Metric & Reference  \\
 	 \hline
-	 Random & NA &  NA \\
-	 \hline
-	 Covariate matched-pairs ITE MSE & \ref{match-mse} & ITE loss \\
-	 Transformed outcome ITE MSE & \ref{match-mse} & ITE loss \\
-	 Covariate matched-pairs ITE decision cost &  \ref{sec:gain-value} & ITE loss (Value) \\
-	 Transformed outcome ITE decision cost (neg. generalized gain) &  \ref{sec:gain}, \ref{sec:gain-value} & ITE loss (Value) \\
-	 \hline
-	 Traditional gain &  \ref{sec:gain} & Value \\ 
-	 Decision value &  \ref{sec:value} & Value \\
-	 \hline
-	 C-for-benefit &  \ref{other} & AUC \\
-	 Qini coefficient (gain-at-k AUC) &  \ref{other} & AUC \\
-	 Value-at-k AUC &  \ref{other} & AUC \\
-	 \hline
-	 Est. treatment effect strata ITE MSE &  \ref{te-match} & Other \\
-	 \hline
-	 Outcome prediction MSE &  \ref{sec:pred-error} & Outcome loss \\
+	 Random 						& NA  \\
+	 $\widehat{\mu\text{-risk}}$		& \ref{murisk}  \\
+	 $\widehat{\mu\text{-risk}}_{IPTW}$	& \ref{murisk-iptw} \\
+	 $\hat v_{IPTW}$ 				& \ref{value}  \\
+	 $\hat v_{DR}$					& \ref{value-dr} \\
+	 $\widehat{\tau\text{-risk}}_{match}$	& \ref{trisk-match} \\
+	 $\widehat{\tau\text{-risk}}_{IPTW}$ 	& \ref{trisk-iptw} \\
+	 $\widehat{\tau\text{-risk}}_{R}$		& \ref{trisk-r} \\
 	 \hline
 \end{tabu}
 \end{center}
 
-Taking the model that minimizes (or maximizes, when appropriate) one of these metrics on average across validation folds defines a model selection approach. 
+Taking the model that minimizes (or maximizes, when appropriate) one of these metrics defines a model selection approach. 
 
-We split the approaches into several categories based on the theoretical motivation for each. The ITE loss approaches all minimize metrics of the form of equation \ref{te-error}. The ``value'' approaches are those that have some theoretical equivalence to maximizing the decision value of a model. The AUC-style approaches are briefly described in section \ref{other}. 
+The ``random'' approach selects a model uniformly at random from the available models. 
 
-Note that the ``random'' metric assigns a random number to each model, which means that the model selected by that metric is chosen uniformly at random from the available models. 
-
-In simulations with biased treatment assignment, we estimate a propensity score with logistic regression. That estimated propensity is used in place of the true value in calculating all metrics that require a propensity score.
+Several of these metrics require estimates $\check p(\bm x^{(\mathcal V)})$, $\check \mu_w(\bm x^{(\mathcal V)})$, or $\check m(\bm x^{(\mathcal V)})$. In our experiments, we estimate each of these quantities using cross-validated cross-estimation over the validation set alone. The internal cross-validation is run over estimates derived from the same combinations of algorithms and hyperpameters as used by the treatment effect learners. 
 
 \subsubsection{Evaluation metrics}
 
-Let the model $\hat\tau_m$ selected by optimizing metric $h$ in cross-validation be written as $\hat\tau^{*_h}$. 
+Let the model $\hat\tau_m$ selected by optimizing metric $h$ be written as $\hat\tau^{*_h}$. 
 
 We are interested in the quantities
 
 \[
-\tau MSE_h = E[ (\hat\tau^{*_h} (X) - \tau(X))^2 ]
+\tau\text{-risk}_h = E[ (\hat\tau^{*_h} (X) - \tau(X))^2 ]
 \]
 
 and 
@@ -69,27 +79,29 @@ and
 v_h = E[ Y| W =\hat d^{*_h} (X)]
 \]
 
-which we unbiasedly estimate in a large test set $\mathcal{T}$ via
+which we unbiasedly estimate in a large test set $\mathcal{S}$ via
 
 \begin{equation}
 \label{true-mse}
-\tau MSE^{(\mathcal{T})}_h = \frac{1}{|\mathcal{T}|}\sum_{i \in \mathcal{T}} (\hat\tau^{*_h} (x_i) - \tau(x_i))^2
+\tau\text{-risk}^{(\mathcal{S})}_h = \frac{1}{|\mathcal{S}|}\sum_{i \in \mathcal{S}} (\hat\tau^{*_h} (x_i) - \tau(x_i))^2
 \end{equation}
 
 and 
 
 \begin{equation}
 \label{true-value}
-v^{(\mathcal{T})}_h = \frac{1}{|\mathcal{T}|}\sum_{i \in \mathcal{T}} \mu_{\hat d^{*_h}(x_i)}(x_i)
+v^{(\mathcal{S})}_h = \frac{1}{|\mathcal{S}|}\sum_{i \in \mathcal{S}} \mu_{\hat d^{*_h}(x_i)}(x_i)
 \end{equation}
 
 Where $\hat d^{*_h}(x_i) = I(\hat\tau^{*_h}(x_i) > 0)$ as before. 
 
-$\tau MSE_{h}^{(\mathcal{T})}$ calculates how well the selected model estimates the treatment effect for individuals in the test set. $v^{(\mathcal{T})}$ is the decision value of applying the treatment policy $\hat d(x)$ derived from each selected model $\hat \tau (x)$ to the individuals in the test set.
+$\tau\text{-risk}_{h}^{(\mathcal{S})}$ calculates how well the selected model estimates the treatment effect for individuals in the test set. $v^{(\mathcal{S})}$ is the decision value of applying the treatment policy $\hat d(x)$ derived from each selected model to the individuals in the test set.
 
-These are both useful metrics, although only the first ($\tau MSE$, sometimes called ``precision in estimating heteorgenous effects'', or PEHE) has typically been used in simulation studies. To see why the test set decision value is also important, consider two models ($A$ and $B$) that estimate the same treatment effect for all individuals, except two ($i=1$ and $i=2$). Let $\tau(x_1) = \tau(x_2) = 0.1$, i.e. both individuals would benefit from the treatment in reality. Model $A$ estimates $\hat\tau_A(x_1) = -0.1$ and $\hat\tau_A(x_2) = 0.1$. In other words, it incorrectly suggests not treating individual $1$, although the absolute difference $|\hat\tau_A(x_1)-\tau(x_1)| = 0.2$ is quite small, so it is not heavily penalized by $\tau MSE$. Model $B$ estimates $\hat\tau_B(x_1) = 0.1$ and $\hat\tau_B(x_2) = 100$. Model $B$ correctly suggests the treatment for both individuals, but the absolute difference $|\hat\tau_B(x_2)-\tau(x_2)| = 99.9$ is large and is heavily penalized by $\tau MSE$. Often, what we want is a model that correctly assigns treatment to the individuals who stand to benefit from it. Using $\tau MSE$ in this case would favor model $A$ even though it leads to the mistreatment of more individuals than model $B$ does. However, $\tau MSE$ is still a useful metric. There may be cases where a researcher is interested in the precise magnitude of the effect for each individual, perhaps so that scarce resources can be allocated most effectively. 
+These are both useful metrics, although only the first ($\tau\text{-risk}$, sometimes called ``precision in estimating heteorgenous effects'', or PEHE) has typically been used in simulation studies. To see why the test set decision value is also important, consider two models ($A$ and $B$) that estimate the same treatment effect for all individuals, except two ($i=1$ and $i=2$). Let $\tau(x_1) = \tau(x_2) = 0.1$, i.e. both individuals would benefit from the treatment in reality. Model $A$ estimates $\hat\tau_A(x_1) = -0.1$ and $\hat\tau_A(x_2) = 0.1$. In other words, it incorrectly suggests not treating individual $1$, although the absolute difference $|\hat\tau_A(x_1)-\tau(x_1)| = 0.2$ is quite small, so it is not heavily penalized by $\tau MSE$. Model $B$ estimates $\hat\tau_B(x_1) = 0.1$ and $\hat\tau_B(x_2) = 100$. Model $B$ correctly suggests the treatment for both individuals, but the absolute difference $|\hat\tau_B(x_2)-\tau(x_2)| = 99.9$ is large and is heavily penalized by $\tau\text{-risk}$. Often, what we want is a model that correctly assigns treatment to the individuals who stand to benefit from it. Using $\tau\text{-risk}$ in this case would favor model $A$ even though it leads to the mistreatment of more individuals than model $B$ does. However, $\tau\text{-risk}$ is still a useful metric. There may be cases where a researcher is interested in the precise magnitude of the effect for each individual, perhaps so that scarce resources can be allocated most effectively. 
 
-In our simulations, we also calculate the optima of both $v^{(\mathcal{T})}$ and $MSE^{(\mathcal{T})}$ over all the computed models $\hat\tau_m \in \{\hat\tau_1 \dots \hat\tau_M\}$:
+\begin{comment}
+
+In our simulations, we also calculate the optima of both $v^{(\mathcal{S})}$ and $\tau\text{-risk}^{(\mathcal{S})}$ over all the computed models $\hat\tau_m \in \{\hat\tau_1 \dots \hat\tau_M\}$:
 
 \[
 \tau MSE^{(\mathcal{T})}_{*} = \underset{m}{\text{min}} \ \ \frac{1}{|\mathcal{T}|}\sum_{i \in \mathcal{T}} (\hat\tau_m (x_i) - \tau(x_i))^2
@@ -101,7 +113,6 @@ v^{(\mathcal{T})}_{*} = \underset{m}{\text{max}} \ \ \frac{1}{|\mathcal{T}|}\sum
 
 These quantities represent the best possible performance that any model selection method could achieve given the available models in a given simulation. We use these quantities as baselines.
 
-\begin{comment}
 We also calculate these using the true model $\hat\tau = \tau$, which represents the best achievable performance without specifying any models a-priori:
 
 \[
@@ -129,18 +140,77 @@ The closer to zero these are, the better the performance of the model selection 
 
 \subsection{Results}
 
-\begin{figure}
+% latex table generated in R 3.2.2 by xtable 1.7-4 package
+% Wed May  9 15:03:55 2018
+\begin{table}[ht]
 \centering
-\includegraphics[width=\textwidth]{value-sim-comparison}
-\caption{Test-set decision value ($v_h$) of the model selected by each approach (y-axis) in each simulation (x-axis) relative to the test-set decision value of the true best model ($v_*$), averaged over each repetition of the simulation. Selection approaches are ranked top-to-bottom by averages of this quantity taken across all simulations. Values closer to zero indicate that the model selection approach choses better models on average.}
-\end{figure}
+\caption{$\tau\text{-risk}^{(\mathcal{S})}$. True test-set $\tau\text{-risk}$ of the treatment effect model selected according to each metric (rows) in each simulation (columns), averaged across replications. Simulations 9-16 use the same data-generating functions as 1-8, but with nonrandom treatment assignment. Smaller numbers indicate better performance.}
+\begin{tabular}{lllllllll}
+  \hline
+metric & 1 & 2 & 3 & 4 & 5 & 6 & 7 & 8 \\ 
+  \hline
+Random & 0.122 & 2.878 & 2.493 & 1.828 & 1.278 & 2.961 & 5.737 & 2.683 \\ 
+  $\widehat{\mu\text{-risk}}$ & 0.009 & 0.232 & \bfseries{0.016} & 0.902 & 0.313 & 0.950 & 2.959 & 1.687 \\ 
+  $\widehat{\mu\text{-risk}}_{IPTW}$ & 0.009 & 0.232 & \bfseries{0.016} & 0.902 & 0.313 & 0.950 & 2.959 & 1.687 \\ 
+  $\hat v_{IPTW}$ & 0.159 & 0.654 & 4.275 & 0.733 & 0.712 & 0.850 & 4.194 & 1.687 \\ 
+  $\hat v_{DR}$ & 0.453 & 1.109 & 0.486 & 0.485 & 1.373 & 0.884 & 5.900 & 1.396 \\ 
+  $\widehat{\tau\text{-risk}}_{match}$ & 0.013 & 0.510 & 0.983 & 0.066 & 0.260 & 0.928 & 3.631 & 0.851 \\ 
+  $\widehat{\tau\text{-risk}}_{IPTW}$ & 0.057 & 0.108 & 0.077 & 0.160 & 0.318 & 0.780 & 2.818 & 0.753 \\ 
+  $\widehat{\tau\text{-risk}}_{R}$ & \bfseries{0.008} & \bfseries{0.056} & 0.017 & \bfseries{0.039} & \bfseries{0.044} & \bfseries{0.777} & \bfseries{2.809} & \bfseries{0.744} \\ 
+  \hline
+   \\
+  \\
+  \hline
+metric & 9 & 10 & 11 & 12 & 13 & 14 & 15 & 16 \\ 
+  \hline
+Random & 0.418 & 3.231 & 11.555 & 3.404 & 6.254 & 3.039 & 7.694 & 3.542 \\ 
+  $\widehat{\mu\text{-risk}}$ & 0.010 & 0.294 & \bfseries{0.021} & 0.806 & \bfseries{0.054} & 1.244 & \bfseries{3.872} & 2.533 \\ 
+  $\widehat{\mu\text{-risk}}_{IPTW}$ & 0.012 & \bfseries{0.293} & 0.032 & 0.797 & 0.061 & 1.218 & 4.061 & 2.409 \\ 
+  $\hat v_{IPTW}$ & 0.929 & 1.834 & 14.297 & 1.589 & 7.145 & 1.204 & 5.585 & 2.199 \\ 
+  $\hat v_{DR}$ & 1.953 & 1.663 & 2.552 & 3.663 & 39.298 & 1.137 & 11.515 & 2.920 \\ 
+  $\widehat{\tau\text{-risk}}_{match}$ & 0.391 & 1.644 & 4.336 & 1.780 & 9.416 & 1.391 & 4.673 & 1.607 \\ 
+  $\widehat{\tau\text{-risk}}_{IPTW}$ & 0.912 & 0.486 & 2.507 & 1.178 & 5.169 & \bfseries{1.096} & 4.293 & 2.187 \\ 
+  $\widehat{\tau\text{-risk}}_{R}$ & \bfseries{0.007} & 0.349 & 1.969 & \bfseries{0.164} & 0.069 & 1.133 & 3.949 & \bfseries{1.527} \\ 
+   \hline
+\end{tabular}
 
-\begin{figure}
+\end{table}
+
+% latex table generated in R 3.2.2 by xtable 1.7-4 package
+% Wed May  9 15:04:17 2018
+\begin{table}[ht]
 \centering
-\includegraphics[width=\textwidth]{tmse-sim-comparison}
-\caption{Test-set treatment effect mean-squared-error ($\tau MSE_h$) of the model selected by each approach (y-axis) in each simulation (x-axis) relative to the test-set  treatment effect mean-squared-error of the true best model ($\tau MSE_*$), averaged over each repetition of the simulation. Selection approaches are ranked top-to-bottom by averages of this quantity taken across all simulations. Values closer to zero indicate that the model selection approach choses better models on average.}
-\end{figure}
+\caption{$v^{(\mathcal{S})}$. True test-set value of the decision rule derived from the treatment effect model selected according to each metric (rows) in each simulation (columns), averaged across replications. Simulations 9-16 use the same data-generating functions as 1-8, but with nonrandom treatment assignment. Larger numbers indicate better performance.}
+\begin{tabular}{lllllllll}
+  \hline
+metric & 1 & 2 & 3 & 4 & 5 & 6 & 7 & 8 \\ 
+  \hline
+Random & \bfseries{0.003} & 0.438 & 1.908 & 0.824 & 0.752 & 0.405 & 0.179 & 0.673 \\ 
+  $\widehat{\mu\text{-risk}}$ & \bfseries{0.003} & 0.773 & 1.991 & 0.990 & 0.899 & 0.656 & 0.662 & 0.815 \\ 
+  $\widehat{\mu\text{-risk}}_{IPTW}$ & \bfseries{0.003} & 0.773 & 1.991 & 0.990 & 0.899 & 0.656 & 0.662 & 0.815 \\ 
+  $\hat v_{IPTW}$ & \bfseries{0.003} & 0.775 & 1.982 & 0.985 & 0.871 & \bfseries{0.673} & 0.656 & 0.814 \\ 
+  $\hat v_{DR}$ & \bfseries{0.003} & 0.673 & 1.984 & 1.002 & 0.805 & 0.656 & 0.547 & 0.826 \\ 
+  $\widehat{\tau\text{-risk}}_{match}$ & \bfseries{0.003} & 0.760 & 1.991 & 1.005 & 0.897 & 0.666 & 0.529 & 0.857 \\ 
+  $\widehat{\tau\text{-risk}}_{IPTW}$ & \bfseries{0.003} & 0.781 & 1.990 & 1.000 & 0.882 & 0.671 & \bfseries{0.691} & 0.862 \\ 
+  $\widehat{\tau\text{-risk}}_{R}$ & \bfseries{0.003} & \bfseries{0.785} & \bfseries{1.991} & \bfseries{1.007} & \bfseries{0.900} & 0.671 & 0.687 & \bfseries{0.863} \\ 
+  \hline
+   \\
+  \\
+  \hline
+metric & 9 & 10 & 11 & 12 & 13 & 14 & 15 & 16 \\ 
+  \hline
+Random & \bfseries{0.003} & 0.419 & 1.718 & 0.584 & 0.675 & 0.410 & 0.097 & 0.602 \\ 
+  $\widehat{\mu\text{-risk}}$ & \bfseries{0.003} & 0.774 & \bfseries{1.994} & 0.930 & \bfseries{0.908} & 0.653 & 0.543 & 0.698 \\ 
+  $\widehat{\mu\text{-risk}}_{IPTW}$ & \bfseries{0.003} & 0.777 & 1.994 & 0.929 & 0.907 & \bfseries{0.654} & 0.509 & 0.716 \\ 
+  $\hat v_{IPTW}$ & \bfseries{0.003} & 0.738 & 1.920 & 0.891 & 0.535 & 0.652 & \bfseries{0.592} & 0.756 \\ 
+  $\hat v_{DR}$ & \bfseries{0.003} & 0.577 & 1.892 & 0.714 & 0.124 & 0.649 & 0.202 & 0.654 \\ 
+  $\widehat{\tau\text{-risk}}_{match}$ & \bfseries{0.003} & 0.475 & 1.960 & 0.846 & 0.128 & 0.643 & 0.434 & 0.789 \\ 
+  $\widehat{\tau\text{-risk}}_{IPTW}$ & \bfseries{0.003} & 0.745 & 1.964 & 0.910 & 0.575 & 0.652 & 0.577 & 0.777 \\ 
+  $\widehat{\tau\text{-risk}}_{R}$ & \bfseries{0.003} & \bfseries{0.788} & 1.981 & \bfseries{0.979} & 0.907 & 0.653 & 0.555 & \bfseries{0.799} \\ 
+   \hline
+\end{tabular}
+\end{table}
 
-ITE loss-minimizing approaches perform well, but those that employ covariate matching are notably worse off in several simulations, likely due to the difficulty of finding good covariate matches in high dimensions. All of the approaches related to value estimation perform similarly, as expected, since the metrics they are optimizing have equivalent differences in expectation (theorem \ref{gain-value}). In some simulations with biased assignment, the traditional formulation of gain does poorly where our generalized version succeeds, presumably because our formulation correctly incorporates the propensity score. Of the AUC-style approaches, the Qini coefficient performs poorly, C-for-benefit performs reasonably, and our proposed value-at-k AUC does well. Stratifying on the predicted treatment effect as described in section \ref{te-match} fares poorly, as predicted. A straightforward application of outcome prediction MSE does very well. Random model selection leads to reasonable performance in many simulations because all of the available models perform only somewhat worse than the best among them. This is reflective of real-world use where poor models or hyperparameter combinations are removed a-priori. 
+$\widehat{\tau\text{-risk}}_{R}$ is the metric that most consistently selects models with low $\tau\text{-risk}$ and high value. This is especially true with randomized treatment assignment, but also holds with observational data. In the simulations where other model selection approaches win out, it is typically by an insignificant margin.
 
-Relative performance between methods is similar when gauged by test-set decision value and by test-set $\tau MSE$. 
+

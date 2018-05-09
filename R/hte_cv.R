@@ -22,6 +22,8 @@ wmse = function(y, iptw, y_hat) sum(iptw*(y_hat-y)^2)/sum(iptw)
 #' @export
 bundle_wmse = function(bundle, y_hat, tau_hat) bundle %$% wmse(y, iptw, y_hat)
 
+
+
 ####################################################
 ######################## τ-risk ####################
 ####################################################
@@ -64,7 +66,7 @@ bundle_ip_value = function(bundle, y_hat, tau_hat) bundle %$% ip_value(w, y, ipt
 #' @export
 dml_value = function(w, y, iptw, mu0, mu1, tau_hat) {
 	gamma = mu1 - mu0 + trans_tau(w, y, iptw) - w*trans_tau(w, mu1, iptw) + (1-w)*trans_tau(w, mu0, iptw)
-	mean((2*(tau_hat>1)-1)*gamma)
+	mean((2*(tau_hat>0)-1)*gamma)
 }
 #' @export
 bundle_dml_value = function(bundle, y_hat, tau_hat) bundle %$% dml_value(w, y, iptw, mu0, mu1, tau_hat)
