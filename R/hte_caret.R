@@ -13,8 +13,8 @@ summary_metrics = function(data, lev=NULL, model=NULL) {
 	}
 }
 
-# takes a list of fit caret models (hyperparams already optimized by caret), returns the one with lowest wRMSE or 
-# highest wAccuracy
+# takes a list of fit caret models (hyperparams already optimized by caret), returns the one with lowest weighted MSE (regression) 
+# or highest weighted accuracy (classification)
 pick_model = function(models) {
 	if(length(models)==1) {
 		return(models[[1]])
@@ -32,6 +32,7 @@ pick_model = function(models) {
 
 # this function only returns the test-set predictions from the model determined best via internal k-fold cross-validation
 # to be used to cross-estimate mu and p on the true validation set
+#' @export 
 learner_cv = function(x, y, model_specs, weights=NULL, k_folds=4) {
 	if(is.logical(y)) {y = factor(ifelse(y, "treated", "control"))}
 	model_specs %>% imap(function(settings, method) {
@@ -52,6 +53,7 @@ learner_cv = function(x, y, model_specs, weights=NULL, k_folds=4) {
 	)
 }
 
+#' @export
 learners_pred_test = function(training_index, x, y, model_specs, weights=NULL) {
 	if(is.logical(y)) {y = factor(ifelse(y, "treated", "control"))}
 	model_specs %>% imap(function(settings, method) {
@@ -77,6 +79,7 @@ learners_pred_test = function(training_index, x, y, model_specs, weights=NULL) {
 }
 
 # model specs should be a list, each element of which is a list(method=list(tune_grid, extra_args))
+#' @export
 cross_validated_cross_estimation = function(x, y, model_specs, weights=NULL, k_folds_cv=4, k_folds_ce=4) {
 	test_indices = createFolds(y, k=k_folds_ce) 
 	test_indices %>% map(function(test_index) {
@@ -93,6 +96,7 @@ cross_validated_cross_estimation = function(x, y, model_specs, weights=NULL, k_f
 
 # returns a fit R-learner model object. mu_hat and p_hat are cross-validatedly cross-estimated, then fixed.
 # The hyperparameters of the tau_hat model are selected with cross-validation and is refit to the full data
+#' @export
 R_learner_cv = function(x, w, y, mu_model_specs, p_model_specs, tau_model_specs, k_folds_cv=4, k_folds_ce=4) {
 	mu_hat = cross_validated_cross_estimation(
 		x, y, mu_model_specs, 

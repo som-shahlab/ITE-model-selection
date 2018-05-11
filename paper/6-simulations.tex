@@ -1,4 +1,4 @@
-\section{Simulations}
+\section{Experiments}
 \label{simulations}
 
 \subsection{Overview}
@@ -11,7 +11,7 @@ We use the sixteen simulations from \citet{Powers:2017wd}, each of which we repe
 
 \subsubsection{Models}
 
-We fit several treatment effect models to each simulated dataset using the S-, T- and R-learning frameworks.
+We fit several treatment effect models to each simulated dataset using the S-, T- and R-learning frameworks. Let $f(\bm x) = [f(x_i) \dots f(x_n)]$.
 
 \paragraph{S-learners} We fit a variety of S-learners to each simulated dataset by regressing $\bm y^{(\mathcal T)}$ onto $[\bm x^{(\mathcal T)}, \bm z^{(\mathcal T)}]$ to produce $\hat\mu(x,w)$. The term $\bm z^{(\mathcal T)}$ is determined by $z_i = ( w_i- 0.5) x_i$ and ensures that the treatment effect is not implicitly regularized \cite{Nie:2017vi}. The treatment effect is calculated as $\hat\tau(x) = \hat\mu(x,1) - \hat\mu(x,0)$. 
 
@@ -97,7 +97,7 @@ Where $\hat d^{*_h}(x_i) = I(\hat\tau^{*_h}(x_i) > 0)$ as before.
 
 $\tau\text{-risk}_{h}^{(\mathcal{S})}$ calculates how well the selected model estimates the treatment effect for individuals in the test set. $v^{(\mathcal{S})}$ is the decision value of applying the treatment policy $\hat d(x)$ derived from each selected model to the individuals in the test set.
 
-These are both useful metrics, although only the first ($\tau\text{-risk}$, sometimes called ``precision in estimating heteorgenous effects'', or PEHE) has typically been used in simulation studies. To see why the test set decision value is also important, consider two models ($A$ and $B$) that estimate the same treatment effect for all individuals, except two ($i=1$ and $i=2$). Let $\tau(x_1) = \tau(x_2) = 0.1$, i.e. both individuals would benefit from the treatment in reality. Model $A$ estimates $\hat\tau_A(x_1) = -0.1$ and $\hat\tau_A(x_2) = 0.1$. In other words, it incorrectly suggests not treating individual $1$, although the absolute difference $|\hat\tau_A(x_1)-\tau(x_1)| = 0.2$ is quite small, so it is not heavily penalized by $\tau MSE$. Model $B$ estimates $\hat\tau_B(x_1) = 0.1$ and $\hat\tau_B(x_2) = 100$. Model $B$ correctly suggests the treatment for both individuals, but the absolute difference $|\hat\tau_B(x_2)-\tau(x_2)| = 99.9$ is large and is heavily penalized by $\tau\text{-risk}$. Often, what we want is a model that correctly assigns treatment to the individuals who stand to benefit from it. Using $\tau\text{-risk}$ in this case would favor model $A$ even though it leads to the mistreatment of more individuals than model $B$ does. However, $\tau\text{-risk}$ is still a useful metric. There may be cases where a researcher is interested in the precise magnitude of the effect for each individual, perhaps so that scarce resources can be allocated most effectively. 
+These are both useful metrics, although only the first ($\tau\text{-risk}$), sometimes called ``precision in estimating heteorgenous effects'', or PEHE) has typically been used in simulation studies in the individual effect estimation literature while $v^{(\mathcal{S})}$ is used in the policy learning literature. To see why they are both important, consider two models ($A$ and $B$) that estimate the same treatment effect for all individuals, except for two individuals ($i=1$ and $i=2$). Let $\tau(x_1) = \tau(x_2) = 0.1$, i.e. both individuals would benefit from the treatment in reality. Model $A$ estimates $\hat\tau_A(x_1) = -0.1$ and $\hat\tau_A(x_2) = 0.1$. In other words, it incorrectly suggests not treating individual $1$, although the absolute difference $|\hat\tau_A(x_1)-\tau(x_1)| = 0.2$ is quite small, so it is not heavily penalized according to $\tau\text{-risk}$. Model $B$ estimates $\hat\tau_B(x_1) = 0.1$ and $\hat\tau_B(x_2) = 100$. Model $B$ correctly suggests the treatment for both individuals, but the absolute difference $|\hat\tau_B(x_2)-\tau(x_2)| = 99.9$ is large and is heavily penalized by $\tau\text{-risk}$. Often, what we want is a model that correctly assigns treatment to the individuals who stand to benefit from it. Using $\tau\text{-risk}$ in this case would favor model $A$ even though it leads to the mistreatment of more individuals than model $B$ does. However, $\tau\text{-risk}$ is still a useful metric. There may be cases where a researcher is interested in the precise magnitude of the effect for each individual, perhaps so that scarce resources can be allocated most effectively. 
 
 \begin{comment}
 
@@ -149,31 +149,31 @@ The closer to zero these are, the better the performance of the model selection 
   \hline
 metric & 1 & 2 & 3 & 4 & 5 & 6 & 7 & 8 \\ 
   \hline
-Random & 0.122 & 2.878 & 2.493 & 1.828 & 1.278 & 2.961 & 5.737 & 2.683 \\ 
-  $\widehat{\mu\text{-risk}}$ & 0.009 & 0.232 & \bfseries{0.016} & 0.902 & 0.313 & 0.950 & 2.959 & 1.687 \\ 
-  $\widehat{\mu\text{-risk}}_{IPTW}$ & 0.009 & 0.232 & \bfseries{0.016} & 0.902 & 0.313 & 0.950 & 2.959 & 1.687 \\ 
-  $\hat v_{IPTW}$ & 0.159 & 0.654 & 4.275 & 0.733 & 0.712 & 0.850 & 4.194 & 1.687 \\ 
-  $\hat v_{DR}$ & 0.453 & 1.109 & 0.486 & 0.485 & 1.373 & 0.884 & 5.900 & 1.396 \\ 
-  $\widehat{\tau\text{-risk}}_{match}$ & 0.013 & 0.510 & 0.983 & 0.066 & 0.260 & 0.928 & 3.631 & 0.851 \\ 
-  $\widehat{\tau\text{-risk}}_{IPTW}$ & 0.057 & 0.108 & 0.077 & 0.160 & 0.318 & 0.780 & 2.818 & 0.753 \\ 
-  $\widehat{\tau\text{-risk}}_{R}$ & \bfseries{0.008} & \bfseries{0.056} & 0.017 & \bfseries{0.039} & \bfseries{0.044} & \bfseries{0.777} & \bfseries{2.809} & \bfseries{0.744} \\ 
+Random & 0.102 & 2.684 & 2.223 & 1.718 & 1.233 & 2.845 & 5.859 & 2.677 \\ 
+  $\widehat{\mu\text{-risk}}$ & \bfseries{0.007} & 0.235 & \bfseries{0.014} & 0.808 & 0.212 & 0.963 & 2.970 & 1.738 \\ 
+  $\widehat{\mu\text{-risk}}_{IPTW}$ & \bfseries{0.007} & 0.235 & \bfseries{0.014} & 0.808 & 0.212 & 0.963 & 2.970 & 1.738 \\ 
+  $\hat v_{IPTW}$ & 0.130 & 0.634 & 4.278 & 0.690 & 0.738 & 0.887 & 4.300 & 1.513 \\ 
+  $\hat v_{DR}$ & 0.052 & 0.969 & 8.458 & 0.785 & 4.466 & 0.972 & 5.759 & 2.577 \\ 
+  $\widehat{\tau\text{-risk}}_{match}$ & 0.013 & 0.542 & 0.964 & 0.068 & 0.260 & 0.970 & 3.681 & 0.815 \\ 
+  $\widehat{\tau\text{-risk}}_{IPTW}$ & 0.056 & 0.101 & 0.050 & 0.154 & 0.288 & \bfseries{0.786} & 2.913 & 0.746 \\ 
+  $\widehat{\tau\text{-risk}}_{R}$ & 0.008 & \bfseries{0.059} & 0.017 & \bfseries{0.035} & \bfseries{0.043} & \bfseries{0.786} & \bfseries{2.794} & \bfseries{0.736} \\ 
   \hline
    \\
   \\
   \hline
 metric & 9 & 10 & 11 & 12 & 13 & 14 & 15 & 16 \\ 
   \hline
-Random & 0.418 & 3.231 & 11.555 & 3.404 & 6.254 & 3.039 & 7.694 & 3.542 \\ 
-  $\widehat{\mu\text{-risk}}$ & 0.010 & 0.294 & \bfseries{0.021} & 0.806 & \bfseries{0.054} & 1.244 & \bfseries{3.872} & 2.533 \\ 
-  $\widehat{\mu\text{-risk}}_{IPTW}$ & 0.012 & \bfseries{0.293} & 0.032 & 0.797 & 0.061 & 1.218 & 4.061 & 2.409 \\ 
-  $\hat v_{IPTW}$ & 0.929 & 1.834 & 14.297 & 1.589 & 7.145 & 1.204 & 5.585 & 2.199 \\ 
-  $\hat v_{DR}$ & 1.953 & 1.663 & 2.552 & 3.663 & 39.298 & 1.137 & 11.515 & 2.920 \\ 
-  $\widehat{\tau\text{-risk}}_{match}$ & 0.391 & 1.644 & 4.336 & 1.780 & 9.416 & 1.391 & 4.673 & 1.607 \\ 
-  $\widehat{\tau\text{-risk}}_{IPTW}$ & 0.912 & 0.486 & 2.507 & 1.178 & 5.169 & \bfseries{1.096} & 4.293 & 2.187 \\ 
-  $\widehat{\tau\text{-risk}}_{R}$ & \bfseries{0.007} & 0.349 & 1.969 & \bfseries{0.164} & 0.069 & 1.133 & 3.949 & \bfseries{1.527} \\ 
-   \hline
+Random & 0.401 & 3.178 & 61.830 & 4.143 & 4.173 & 3.019 & 8.899 & 4.235 \\ 
+  $\widehat{\mu\text{-risk}}$ & 0.012 & 0.290 & \bfseries{0.020} & 0.797 & \bfseries{0.055} & 1.277 & \bfseries{3.900} & 2.495 \\ 
+  $\widehat{\mu\text{-risk}}_{IPTW}$ & 0.013 & \bfseries{0.288} & 0.040 & 0.782 & 0.060 & 1.250 & 4.050 & 2.277 \\ 
+  $\hat v_{IPTW}$ & 0.822 & 1.290 & 4.542 & 1.677 & 5.247 & 1.274 & 6.174 & 2.431 \\ 
+  $\hat v_{DR}$ & 0.146 & 1.169 & 5.678 & 1.821 & 26.571 & 1.356 & 7.340 & 2.668 \\ 
+  $\widehat{\tau\text{-risk}}_{match}$ & 0.400 & 1.617 & 4.400 & 1.769 & 9.399 & 1.425 & 4.284 & 1.661 \\ 
+  $\widehat{\tau\text{-risk}}_{IPTW}$ & 1.049 & 0.451 & 2.387 & 1.129 & 4.260 & \bfseries{1.120} & 4.133 & 2.123 \\ 
+  $\widehat{\tau\text{-risk}}_{R}$ & \bfseries{0.008} & 0.348 & 1.986 & \bfseries{0.149} & 0.078 & 1.169 & 3.923 & \bfseries{1.539} \\ 
+     \hline
 \end{tabular}
-
+\label{tmse-table}
 \end{table}
 
 % latex table generated in R 3.2.2 by xtable 1.7-4 package
@@ -185,32 +185,40 @@ Random & 0.418 & 3.231 & 11.555 & 3.404 & 6.254 & 3.039 & 7.694 & 3.542 \\
   \hline
 metric & 1 & 2 & 3 & 4 & 5 & 6 & 7 & 8 \\ 
   \hline
-Random & \bfseries{0.003} & 0.438 & 1.908 & 0.824 & 0.752 & 0.405 & 0.179 & 0.673 \\ 
-  $\widehat{\mu\text{-risk}}$ & \bfseries{0.003} & 0.773 & 1.991 & 0.990 & 0.899 & 0.656 & 0.662 & 0.815 \\ 
-  $\widehat{\mu\text{-risk}}_{IPTW}$ & \bfseries{0.003} & 0.773 & 1.991 & 0.990 & 0.899 & 0.656 & 0.662 & 0.815 \\ 
-  $\hat v_{IPTW}$ & \bfseries{0.003} & 0.775 & 1.982 & 0.985 & 0.871 & \bfseries{0.673} & 0.656 & 0.814 \\ 
-  $\hat v_{DR}$ & \bfseries{0.003} & 0.673 & 1.984 & 1.002 & 0.805 & 0.656 & 0.547 & 0.826 \\ 
-  $\widehat{\tau\text{-risk}}_{match}$ & \bfseries{0.003} & 0.760 & 1.991 & 1.005 & 0.897 & 0.666 & 0.529 & 0.857 \\ 
-  $\widehat{\tau\text{-risk}}_{IPTW}$ & \bfseries{0.003} & 0.781 & 1.990 & 1.000 & 0.882 & 0.671 & \bfseries{0.691} & 0.862 \\ 
-  $\widehat{\tau\text{-risk}}_{R}$ & \bfseries{0.003} & \bfseries{0.785} & \bfseries{1.991} & \bfseries{1.007} & \bfseries{0.900} & 0.671 & 0.687 & \bfseries{0.863} \\ 
+Random & \bfseries{0.008} & 0.501 & 1.914 & 0.791 & 0.771 & 0.446 & 0.138 & 0.685 \\ 
+  $\widehat{\mu\text{-risk}}$ & \bfseries{0.008} & 0.795 & \bfseries{1.998} & 0.966 & 0.906 & 0.663 & 0.642 & 0.835 \\ 
+  $\widehat{\mu\text{-risk}}_{IPTW}$ & \bfseries{0.008} & 0.795 & \bfseries{1.998} & 0.966 & 0.906 & 0.663 & 0.642 & 0.835 \\ 
+  $\hat v_{IPTW}$ & \bfseries{0.008} & 0.798 & 1.989 & 0.969 & 0.877 & \bfseries{0.678} & 0.651 & 0.842 \\ 
+  $\hat v_{DR}$ & \bfseries{0.008} & 0.770 & 1.978 & 0.969 & 0.486 & 0.667 & 0.354 & 0.784 \\ 
+  $\widehat{\tau\text{-risk}}_{match}$ & \bfseries{0.008} & 0.783 & 1.998 & 0.984 & 0.903 & 0.671 & 0.505 & 0.881 \\ 
+  $\widehat{\tau\text{-risk}}_{IPTW}$ & \bfseries{0.008} & 0.806 & 1.997 & 0.979 & 0.890 & 0.678 & 0.672 & \bfseries{0.884} \\ 
+  $\widehat{\tau\text{-risk}}_{R}$ & \bfseries{0.008} & \bfseries{0.809} & 1.998 & \bfseries{0.986} & \bfseries{0.907} & 0.678 & \bfseries{0.687} & 0.883 \\ 
   \hline
    \\
   \\
   \hline
 metric & 9 & 10 & 11 & 12 & 13 & 14 & 15 & 16 \\ 
   \hline
-Random & \bfseries{0.003} & 0.419 & 1.718 & 0.584 & 0.675 & 0.410 & 0.097 & 0.602 \\ 
-  $\widehat{\mu\text{-risk}}$ & \bfseries{0.003} & 0.774 & \bfseries{1.994} & 0.930 & \bfseries{0.908} & 0.653 & 0.543 & 0.698 \\ 
-  $\widehat{\mu\text{-risk}}_{IPTW}$ & \bfseries{0.003} & 0.777 & 1.994 & 0.929 & 0.907 & \bfseries{0.654} & 0.509 & 0.716 \\ 
-  $\hat v_{IPTW}$ & \bfseries{0.003} & 0.738 & 1.920 & 0.891 & 0.535 & 0.652 & \bfseries{0.592} & 0.756 \\ 
-  $\hat v_{DR}$ & \bfseries{0.003} & 0.577 & 1.892 & 0.714 & 0.124 & 0.649 & 0.202 & 0.654 \\ 
-  $\widehat{\tau\text{-risk}}_{match}$ & \bfseries{0.003} & 0.475 & 1.960 & 0.846 & 0.128 & 0.643 & 0.434 & 0.789 \\ 
-  $\widehat{\tau\text{-risk}}_{IPTW}$ & \bfseries{0.003} & 0.745 & 1.964 & 0.910 & 0.575 & 0.652 & 0.577 & 0.777 \\ 
-  $\widehat{\tau\text{-risk}}_{R}$ & \bfseries{0.003} & \bfseries{0.788} & 1.981 & \bfseries{0.979} & 0.907 & 0.653 & 0.555 & \bfseries{0.799} \\ 
+Random & \bfseries{-0.011} & 0.407 & 1.852 & 0.505 & 0.680 & 0.421 & 0.157 & 0.586 \\ 
+  $\widehat{\mu\text{-risk}}$ & \bfseries{-0.011} & 0.762 & \bfseries{1.993} & 0.945 & \bfseries{0.906} & 0.653 & 0.532 & 0.709 \\ 
+  $\widehat{\mu\text{-risk}}_{IPTW}$ & \bfseries{-0.011} & 0.761 & 1.993 & 0.945 & 0.906 & 0.653 & 0.505 & 0.725 \\ 
+  $\hat v_{IPTW}$ & \bfseries{-0.011} & 0.721 & 1.923 & 0.881 & 0.562 & \bfseries{0.656} & \bfseries{0.593} & 0.751 \\ 
+  $\hat v_{DR}$ & \bfseries{-0.011} & 0.703 & 1.969 & 0.945 & 0.142 & 0.654 & 0.177 & 0.671 \\ 
+  $\widehat{\tau\text{-risk}}_{match}$ & \bfseries{-0.011} & 0.494 & 1.960 & 0.861 & 0.126 & 0.647 & 0.481 & 0.790 \\ 
+  $\widehat{\tau\text{-risk}}_{IPTW}$ & \bfseries{-0.011} & 0.740 & 1.966 & 0.921 & 0.598 & 0.653 & 0.579 & 0.786 \\ 
+  $\widehat{\tau\text{-risk}}_{R}$ & \bfseries{-0.011} & \bfseries{0.777} & 1.983 & \bfseries{0.995} & 0.904 & 0.655 & 0.547 & \bfseries{0.806} \\ 
    \hline
 \end{tabular}
+\label{value-table}
 \end{table}
 
-$\widehat{\tau\text{-risk}}_{R}$ is the metric that most consistently selects models with low $\tau\text{-risk}$ and high value. This is especially true with randomized treatment assignment, but also holds with observational data. In the simulations where other model selection approaches win out, it is typically by an insignificant margin.
+\begin{figure}
+  \centering
+    \includegraphics[width=\textwidth]{detailed_results_sim16}
+      \caption{Validation-set and test-set metrics for all treatment effect models, averaged over all replications of simulation 16 (equivalent plots for other simulations show the same patterns). Each point is a single model resulting from a unique combination of meta-learner (S, T, or R), learning algorithm, and hyperparameters. The x-axis facets are the values of $\tau\text{-risk}^{(\mathcal{S})}$ and $-v^{(\mathcal{S})}$ for each model (lower values indicating higher performance). The y-axis facets are the model selection metrics for each model as estimated on the validation set (lower values indicating higher predicted performance). High correlation between a validation-set and test-set metric indicates good performance of the model selection metric.}
+      \label{details16}
+\end{figure}
+
+The results in tables \ref{tmse-table} and \ref{value-table} show that $\widehat{\tau\text{-risk}}_{R}$ is the metric that most consistently selects models with low $\tau\text{-risk}$ and high value. This is especially true when treatment assignment is randomized, but also to a large extent when the assignment is biased. In the simulations where other model selection approaches win out, it is typically by a small margin. Both $\widehat{\mu\text{-risk}}$ and $\widehat{\mu\text{-risk}}_{IPTW}$ perform well (the two are identical in randomized settings). Even when the goal is to optimize value, selecting on the basis of these metrics leads to better performance than using $\hat v_{IPTW}$ or $\hat v_{DR}$. Figure \ref{details16} shows the results from simulation 16 in greater detail.
 
 

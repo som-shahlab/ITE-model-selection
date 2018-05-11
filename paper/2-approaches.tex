@@ -1,7 +1,7 @@
 \section{Metrics for treatment effect model selection via data-splitting}
 \label{approaches}
 
-As we have established, we are interested in statistics that, when optimized on a validation set over a set of available models, also tend to minimize the $\tau$-risk $E[l(\hat\tau, \tau)]$. For the purposes of our discussion, we will focus on risk under squared error loss. Here we describe three approaches that fit the bill.
+As we have established, we are interested in statistics that, when optimized over a set of available model predictions on a validation set, also tend to minimize the $\tau$-risk $E[l(\hat\tau, \tau)]$. For the purposes of our discussion, we will focus on risk under squared error loss. Here we describe three approaches that fit the bill.
 
 The first approach is to minimize the $\mu$-risk $E[l(\hat\mu_{W}(X), Y)]$. As we have seen, this quantity is easy to estimate. Furthermore, a perfect model of the potential outcomes implies a perfect model of the treatment effect, so we are justified in optimizing this quantity.
 
@@ -30,7 +30,7 @@ If treatment assignment is nonrandom, we can appropriately weight each residual 
 \label{murisk-iptw}
 \end{equation}
 
-The effect of this is to create the correct ``pseduo-population'' that would have been observed under random assignment. I.e. if a treated individual $x_i$ had a probability of $0.1$ of being assigned the treatment under the observed nonrandom assignment, their residual should be weighted by a factor of $10$ to account for the 9 other individuals who would have received that treatment had the assignment been random. We use the notation $\check p$ to indicate a quantity that is estimated using only data in the validation set.
+Where $p_{w_i}(x_i) = P(W=w_i | X=x_i)$. This is the propensity score if $w_i = 1$ and one minus the propensity score if $w_i = 0$. The notation $\check a$ indicates a quantity that is estimated using only data in the validation set, whereas $\hat a$ is estimated using only data in the training set. The effect of this is to create the correct ``pseduo-population'' that would have been observed under random assignment. I.e. if a treated individual $x_i$ had a probability of $0.1$ of being assigned the treatment under the observed nonrandom assignment, their residual should be weighted by a factor of $10$ to account for the 9 other individuals who would have received that treatment had the assignment been random.
 
 \subsection{Value}
 \label{sec:value}
@@ -39,13 +39,10 @@ The effect of this is to create the correct ``pseduo-population'' that would hav
 
 \begin{equation}
 \label{value}
-\hat v_{IPTW} = \frac{1}{|\mathcal{V}|}\sum_{\mathcal{V}} \frac{y_i I(w_i=\hat d(x_i))}{p_{w_i}(x_i)}
+\hat v_{IPTW} = \frac{1}{|\mathcal{V}|}\sum_{\mathcal{V}} \frac{y_i I(w_i=\hat d(x_i))}{\check p_{w_i}(x_i)}
 \end{equation}
 
-where again $\check p_{w_i}(x_i)$ is an estimate of $P(W=w_i | X=x_i)$. This is the propensity score if $w_i = 1$ and one minus the propensity score if $w_i = 0$. We call this the inverse propensity of treatment weighted (IPTW) value estimator.
-
-In the randomized setting where $p_{w_i}(x_i) = 0.5$, we can imagine that two side-by-side experiments were run, one in which treatments were assigned according to the model ($W = \hat d(X)$) and one in which they were assigned according to the opposite recommendation ($W = 1 - \hat d(X)$). The data in the validation set are a concatenation of the data from these two experiments. To estimate the value of our model, we average the outcomes of individuals in the first experiment and ignore the data from the second experiment. This is essentially what the estimator in equation \ref{value} is doing. When $p_{w_i}(x_i) \ne 0.5$, we must appropriately weigh the outcomes according to the probability of treatment to accomplish the same goal. \citet{Kapelner:3baXYEjR} give a similar explanation, but omit the role of the propensity score. \citet{Zhao:2017wa} provide a short proof that $\hat v$ is unbiased for the true value $v = E[Y|W = \hat d(X)]$. 
-
+where again $\check p_{w_i}(x_i)$ is an estimate of $P(W=w_i | X=x_i)$.  We call this the inverse propensity of treatment weighted (IPTW) value estimator.\footnote{
 We should note that this estimator is closely related to one commonly used in the direct marketing literature called uplift:
 
 \begin{equation}
@@ -111,7 +108,12 @@ E[\hat v_a - \hat v_b]
 \end{array}
 \]
 
-A problem with both of these estimators is that they rely on the correctness of the propensity model. In addition, they only utilize a portion of the data. $\hat v_{IPTW}$ throws away individuals whose treatments do not match $\hat d(x_i)$ while $\hat g$ throws away individuals for whom $\hat d(x_i) = 0$. In the spirit of \citet{Dudik:tn}, \citet{Athey:wj} overcome this by using a doubly-robust formulation
+Thus a model optimizing any unbiased estimate of uplift also optimizes any unbiased estimate of value in expectation.
+}
+
+In the randomized setting where $p_{w_i}(x_i) = 0.5$, we can imagine that two side-by-side experiments were run, one in which treatments were assigned according to the model ($W = \hat d(X)$) and one in which they were assigned according to the opposite recommendation ($W = 1 - \hat d(X)$). The data in the validation set are a concatenation of the data from these two experiments. To estimate the value of our model, we average the outcomes of individuals in the first experiment and ignore the data from the second experiment. This is essentially what the estimator in equation \ref{value} is doing. When $p_{w_i}(x_i) \ne 0.5$, we must appropriately weigh the outcomes according to the probability of treatment to accomplish the same goal. \citet{Kapelner:3baXYEjR} give a similar explanation, but omit the role of the propensity score. \citet{Zhao:2017wa} provide a short proof that $\hat v$ is unbiased for the true value $v = E[Y|W = \hat d(X)]$. 
+
+A problem with this estimator is that it depends on the correctness of the propensity model. In addition, it only utilizes a portion of the data: $\hat v_{IPTW}$ throws away individuals whose treatments do not match $\hat d(x_i)$. In the spirit of \citet{Dudik:tn}, \citet{Athey:wj} overcome this by using a doubly-robust formulation
 
 \begin{equation}
 	\hat v_{DR} = \frac{1}{|\mathcal{V}|}\sum_{\mathcal{V}}
@@ -143,9 +145,7 @@ Here, $\check \tau$ is a plug-in estimate of $\tau$ estimated using data in the 
 
 They prove under general assumptions and a squared-error loss that a more mathematically tractable version of their algorithm has selection consistency, meaning that it correctly selects the best model as the number of individuals goes to infinity. They conjecture that the practical version of the algorithm retains this property.
 
-A downside of this approach are that Mahalanobis matching scales relatively poorly and matches become difficult to find in high-dimensional covariate spaces.
-
-An alternative proposed by \citet{Gutierrez:2016tq} takes advantage of the fact that the IPTW-weighted (transformed) outcome $\frac{(2W-1)Y}{p_W(X)}$ is an estimator for $\tau$:
+A downside of this approach are that Mahalanobis matching scales relatively poorly and matches become difficult to find in high-dimensional covariate spaces. An alternative proposed by \citet{Gutierrez:2016tq} takes advantage of the fact that the IPTW-weighted (transformed) outcome $\frac{(2W-1)Y}{p_W(X)}$ is an estimator for $\tau$:
 
 \begin{equation}
 \widehat{\tau\text{-risk}}_{IPTW} = 
@@ -154,9 +154,9 @@ An alternative proposed by \citet{Gutierrez:2016tq} takes advantage of the fact 
 \label{trisk-iptw}
 \end{equation}
 
-This formulation is also used for model fitting in the transformed-outcome forest of \citet{Powers:2017wd}.
+This formulation is also used for model fitting in the transformed-outcome forest of \citet{Powers:2017wd} and in some versions of the causal tree in \citet{Athey2015}.
 
-\citet{Nie:2017vi} deviate from this schema and propose minimizing
+Our final approach deviates from this schema and is due to \citet{Nie:2017vi}, who propose minimizing
 
 \begin{equation}
 \widehat{\tau\text{-risk}}_{R} = 
