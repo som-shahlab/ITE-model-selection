@@ -29,6 +29,11 @@ bundle_wmse = function(bundle, y_hat, tau_hat) bundle %$% wmse(y, iptw, y_hat)
 ####################################################
 
 #' @export
+dr_mse = function(w, y, p,  mu0, mu1, tau_hat) sum(((y - (w-p)*tau_hat)/(p*(1-p)))^2)
+#' @export
+bundle_dr_mse = function(bundle, y_hat, tau_hat) bundle %$% dr_mse(w, y, p,  mu0, mu1, tau_hat)
+
+#' @export
 r_objective = function(weight, pseudo_outcome, tau_hat) wmse(pseudo_outcome, weight, tau_hat)
 #' @export
 bundle_r_objective = function(bundle, y_hat, tau_hat) bundle %$% r_objective(weight, pseudo_outcome, tau_hat)

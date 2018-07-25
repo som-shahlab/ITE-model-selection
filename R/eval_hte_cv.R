@@ -73,6 +73,7 @@ learn_validation_auxiliaries = function(data, ival, model_specs, randomized=F) {
         matches = find_matches(x_val, w_val),
         w = w_val,
         y = y_val,
+        p = p_hat_val,
         mu0 = mu0_hat_val,
         mu1 = mu1_hat_val,
         pseudo_outcome = (y_val - mu_hat_val)/(w_val - p_hat_val),
