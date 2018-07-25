@@ -3,21 +3,23 @@
 
 \subsection{Overview}
 
-We demonstrate the utility of these approaches using simulations. Each simulation is defined by a data-generating process with a known effect function, which allows us to compute true test set errors. Each run of each simulation generates a dataset, which we split into training and test samples. We perform $5$-fold cross validation on the training data and compute each model selection metric on each validation fold. I.e. for each training fold, we estimate $M$ different treatment effect functions $\hat\tau_m$ and for each of those we calculate each metric using the data in the corresponding validation fold. The metrics are averaged for each model across all folds. Each model selection approach then selects the model among the $M$ models that minimizes (or maximizes, when appropriate) its corresponding metric. The models selected by each approach on the basis of cross-validation are refit on the full training data and applied to the test set. The test-set treatment effect estimates of each model are compared to the known effects to calculate the true cost of using each approach for model selection. Each simulation is repeated multiple times. All of the code used to set up, run, and analyze the simulations is feely available on \href{https://github.com/som-shahlab/ITE-model-selection}{github}.
+We demonstrate the utility of these approaches using simulations. Each simulation is defined by a data-generating process with a known effect function, which allows us to compute true test set errors. Each run of each simulation generates a dataset, which we split into training, validation, and test samples. We use the training data to estimate $M$ different treatment effect functions $\hat\tau_m$ using $M$ different algorithms (e.g. S-learning with gradient boosted trees). For each of those we calculate each validation metric (e.g. $\widehat{\mu\text{-risk}}$, $\hat v_{IPTW}$, $\widehat{\tau\text{-risk}}_{R}$) using the data in validation set. The models selected by optimizing each validation-set metric are then used to estimate treatment effects on the test set. The test-set treatment effect estimates of each model are compared to the known effects to calculate the true cost of using each metric for model selection. Each simulation is repeated multiple times. All of the code used to set up, run, and analyze the simulations is feely available on \href{https://github.com/som-shahlab/ITE-model-selection}{github}.
 
 \subsubsection{Data-generating processes and sampling}
 
-We use the sixteen simulations from \citet{Powers:2017wd}, each of which we repeat $100$ times. In each repetition, $1000$ samples are used for training ($\mathcal{T}$), $1000$ for validation ($\mathcal{V}$), and $1000$ for testing ($\mathcal{S}$). Let the data be denoted by $\{\bm y, \bm w, \bm x\} = \{[y_1 \dots y_n]^T, [w_1 \dots w_n]^T, [x_1 \dots x_n]^T\}$ where $n = |\mathcal{T}| + |\mathcal{V} | + |\mathcal{S}|$. Let $\bm y^{(\mathcal A)}$ represent $[y_i | i \in \mathcal A]$. Let the set of treated individuals be $\mathcal W_1 = \{i | w_i =1\}$ and let the set of untreated individuals be $\mathcal W_0 = \{i | w_i =0\}$.
+We use the sixteen simulations from \citet{Powers:2017wd}, each of which we repeat $100$ times. The data-generating process in each simulation all satisfy the usual assumptions made about ignorability, SUTVA, and positivity, but vary in the amount of nonlinearity in the conditional mean functions and signal-to-noise ratio. Details may be found in \citet{Powers:2017wd}. 
 
-\subsubsection{Models}
+In each repetition of each simulation, $1000$ samples are used for training ($\mathcal{T}$), $1000$ for validation ($\mathcal{V}$), and $1000$ for testing ($\mathcal{S}$). Let the data be denoted by $\{\bm y, \bm w, \bm x\} = \{[y_1 \dots y_n]^T, [w_1 \dots w_n]^T, [x_1 \dots x_n]^T\}$ where $n = |\mathcal{T}| + |\mathcal{V} | + |\mathcal{S}|$. Let $\bm y^{(\mathcal A)}$ represent $[y_i | i \in \mathcal A]$. Let the set of treated individuals be $\mathcal W_1 = \{i | w_i =1\}$ and let the set of untreated individuals be $\mathcal W_0 = \{i | w_i =0\}$. In a slight abuse of notation, let $f(\bm x) = [f(x_i) \dots f(x_n)]$.
 
-We fit several treatment effect models to each simulated dataset using the S-, T- and R-learning frameworks. Let $f(\bm x) = [f(x_i) \dots f(x_n)]$.
+\subsubsection{Learning Algorithms}
 
-\paragraph{S-learners} We fit a variety of S-learners to each simulated dataset by regressing $\bm y^{(\mathcal T)}$ onto $[\bm x^{(\mathcal T)}, \bm z^{(\mathcal T)}]$ to produce $\hat\mu(x,w)$. The term $\bm z^{(\mathcal T)}$ is determined by $z_i = ( w_i- 0.5) x_i$ and ensures that the treatment effect is not implicitly regularized \cite{Nie:2017vi}. The treatment effect is calculated as $\hat\tau(x) = \hat\mu(x,1) - \hat\mu(x,0)$. 
+For each simulated dataset, we use the training sample to estimate $M$ different treatment effect functions $\hat\tau_m$ using $M$ different algorithms. The learning algorithms we use here are defined by a unique combination of a meta-learning approach (S-, T-, or R-) \cite{Kunzel:2017vg, Nie:2017vi}, a learning algorithm (e.g. elastic net or gradient boosted trees), and a set of hyperparameter values for that learning algorithm. This provides us with a broad set of estimated functions to select among. It would also be possible to use other estimators (e.g. causal forests or causal boosting) with varying hyperparameter values to estimate individual treatment effect functions, but in this work we restrict ourselves to meta-learning approaches because they can be used off-the-shelf to accommodate a large variety of machine learning algorithms.
+
+\paragraph{S-learners}  In the S-learning framework, a single model $\hat\mu(x,w)$ is fit by regressing $\bm y^{(\mathcal T)}$ onto $[\bm x^{(\mathcal T)}, \bm z^{(\mathcal T)}]$ to produce $\hat\mu(x,w)$. The term $\bm z^{(\mathcal T)}$ is determined by $z_i = ( w_i- 0.5) x_i$ and ensures that the treatment effect is not implicitly regularized \cite{Nie:2017vi}. The treatment effect is calculated as $\hat\tau(x) = \hat\mu(x,1) - \hat\mu(x,0)$. 
 
 The learning algorithms we use to fit $\hat\mu$ are gradient boosted trees (number of trees ranging from $1$ to $500$, tree depth of $3$, shrinkage of $0.2$ and minimum $3$ individuals per node) and elastic nets ($\alpha=0.5$, $\lambda \in [e^{-5}, e^2]$). These models give us a range of high-performing linear and nonlinear models to select among. We estimate a treatment effect model $\hat\tau_m(x)$ for each combination of algorithm and hyperparameters.
 
-\paragraph{T-learners} T-learners are fit by separately regressing $\bm y^{(\mathcal T \cap \mathcal W_0)}$ onto $\bm x^{(\mathcal T \cap \mathcal W_0)}$ to estimate $\hat\mu_0(x)$ and $\bm y^{(\mathcal T \cap \mathcal W_0)}$ onto $\bm x^{(\mathcal T \cap \mathcal W_0)}$ to estimate $\hat\mu_1(x)$. The treatment effect is calculated as $\hat\tau(x) = \hat\mu_1(x) - \hat\mu_0(x)$. 
+\paragraph{T-learners} A T-learner is fit by separately regressing $\bm y^{(\mathcal T \cap \mathcal W_0)}$ onto $\bm x^{(\mathcal T \cap \mathcal W_0)}$ to estimate $\hat\mu_0(x)$ and $\bm y^{(\mathcal T \cap \mathcal W_1)}$ onto $\bm x^{(\mathcal T \cap \mathcal W_1)}$ to estimate $\hat\mu_1(x)$. The treatment effect is calculated as $\hat\tau(x) = \hat\mu_1(x) - \hat\mu_0(x)$. 
 
 We use the same algorithms and hyperparameters as above to fit the models $\hat\mu_w(x)$. When estimating the various treatment effect models $\hat\tau_m(x)$, we only consider combinations of models $\hat\mu_1$ and $\hat\mu_0$ that were fit using the same algorithm with the same hyperparameters. This increases computational efficiency, but need not be done in practice (i.e. $\hat\mu_0$ could be fit using a linear model and $\hat\mu_1$ fit using a random forest). It is an appropriate simplification to make in our experiments since our focus is on model selection and not model fitting.
 
@@ -31,7 +33,7 @@ We use the same algorithms and hyperparameters as above to fit the models $\hat\
 
 over a space of candidate models $t(x)$. Given $\hat m(x)$ and $\hat p(x)$, this is equivalent to a weighted least-squares problem with a pseudo-outcome of $\frac{ y_i - \hat m(x_i) }{w_i - \hat p(x_i)}$ and weights of $(w_i - \hat p(x_i))^2$. As such, it can be solved using a variety of learning algorithms. 
 
-In our experiments, we estimate the quantities $\hat m(\bm x^{(\mathcal T)})$ and $\hat p(\bm x^{(\mathcal T)})$ using cross-validated cross-estimation over the training set \cite{Nie:2017vi, Wager:2016dz}. The internal cross-validation is run over estimates derived from the same combinations of algorithms and hyperpameters as used by the S- and T-learners. These estimates are then fixed and used for all R-learners. Each R-learner $\hat\tau_m(x)$ is then produced by minimizing equation \ref{r-learner} using a different learning algorithm and set of hyperparameters. We use the same combinations of algorithms and hyperpameters as used by the S- and T-learners.
+In our experiments, we estimate the quantities $\hat m(\bm x^{(\mathcal T)})$ and $\hat p(\bm x^{(\mathcal T)})$ once per simulated dataset using cross-validated cross-estimation over the training set \cite{Nie:2017vi, Wager:2016dz}. The internal cross-validation is run over estimates derived from the same combinations of algorithms and hyperpameters as used by the S- and T-learners. These estimates are then fixed and used for all R-learners. Each R-learner $\hat\tau_m(x)$ is produced by minimizing equation \ref{r-learner}, again using each combination $m$ of learning algorithm and hyperparameter values.
 
 \subsubsection{Model selection metrics}
 
@@ -41,20 +43,21 @@ The following metrics are used to select among models in each simulation:
 
 \begin{center}
 \tabulinesep=1mm
-\begin{tabu}{|l|c|}
+\begin{tabu}{|l|c|l|}
 	\hline
-	 \rowfont[c]{\bfseries} Metric & Reference  \\
+	 \rowfont[c]{\bfseries} Metric & Equation &  Reference \\
 	 \hline
-	 Random 						& NA  \\
-	 $\widehat{\mu\text{-risk}}$		& \ref{murisk}  \\
-	 $\widehat{\mu\text{-risk}}_{IPTW}$	& \ref{murisk-iptw} \\
-	 $\hat v_{IPTW}$ 				& \ref{value}  \\
-	 $\hat v_{DR}$					& \ref{value-dr} \\
-	 $\widehat{\tau\text{-risk}}_{match}$	& \ref{trisk-match} \\
-	 $\widehat{\tau\text{-risk}}_{IPTW}$ 	& \ref{trisk-iptw} \\
-	 $\widehat{\tau\text{-risk}}_{R}$		& \ref{trisk-r} \\
+	 Random 						& NA  			& NA \\
+	 $\widehat{\mu\text{-risk}}$		& \ref{murisk}  		& NA \\
+	 $\widehat{\mu\text{-risk}}_{IPTW}$	& \ref{murisk-iptw} 	& \citet{VanderLaan:2003ir} \\
+	 $\hat v_{IPTW}$ 				& \ref{value}  		& \citet{Zhao:2017wa} \\
+	 $\hat v_{DR}$					& \ref{value-dr}		& \citet{Athey:wj}  \\
+	 $\widehat{\tau\text{-risk}}_{match}$	& \ref{trisk-match}	& \citet{Rolling:2013kz} \\
+	 $\widehat{\tau\text{-risk}}_{IPTW}$ 	& \ref{trisk-iptw} 	& \citet{Gutierrez:2016tq} \\
+	 $\widehat{\tau\text{-risk}}_{R}$		& \ref{trisk-r} 		& \citet{Nie:2017vi} \\
 	 \hline
 \end{tabu}
+\label{metric-table}
 \end{center}
 
 Taking the model that minimizes (or maximizes, when appropriate) one of these metrics defines a model selection approach. 
@@ -99,44 +102,12 @@ $\tau\text{-risk}_{h}^{(\mathcal{S})}$ calculates how well the selected model es
 
 These are both useful metrics, although only the first ($\tau\text{-risk}$), sometimes called ``precision in estimating heteorgenous effects'', or PEHE) has typically been used in simulation studies in the individual effect estimation literature while $v^{(\mathcal{S})}$ is used in the policy learning literature. To see why they are both important, consider two models ($A$ and $B$) that estimate the same treatment effect for all individuals, except for two individuals ($i=1$ and $i=2$). Let $\tau(x_1) = \tau(x_2) = 0.1$, i.e. both individuals would benefit from the treatment in reality. Model $A$ estimates $\hat\tau_A(x_1) = -0.1$ and $\hat\tau_A(x_2) = 0.1$. In other words, it incorrectly suggests not treating individual $1$, although the absolute difference $|\hat\tau_A(x_1)-\tau(x_1)| = 0.2$ is quite small, so it is not heavily penalized according to $\tau\text{-risk}$. Model $B$ estimates $\hat\tau_B(x_1) = 0.1$ and $\hat\tau_B(x_2) = 100$. Model $B$ correctly suggests the treatment for both individuals, but the absolute difference $|\hat\tau_B(x_2)-\tau(x_2)| = 99.9$ is large and is heavily penalized by $\tau\text{-risk}$. Often, what we want is a model that correctly assigns treatment to the individuals who stand to benefit from it. Using $\tau\text{-risk}$ in this case would favor model $A$ even though it leads to the mistreatment of more individuals than model $B$ does. However, $\tau\text{-risk}$ is still a useful metric. There may be cases where a researcher is interested in the precise magnitude of the effect for each individual, perhaps so that scarce resources can be allocated most effectively. 
 
-\begin{comment}
-
-In our simulations, we also calculate the optima of both $v^{(\mathcal{S})}$ and $\tau\text{-risk}^{(\mathcal{S})}$ over all the computed models $\hat\tau_m \in \{\hat\tau_1 \dots \hat\tau_M\}$:
-
-\[
-\tau MSE^{(\mathcal{T})}_{*} = \underset{m}{\text{min}} \ \ \frac{1}{|\mathcal{T}|}\sum_{i \in \mathcal{T}} (\hat\tau_m (x_i) - \tau(x_i))^2
-\]
-
-\[
-v^{(\mathcal{T})}_{*} = \underset{m}{\text{max}} \ \ \frac{1}{|\mathcal{T}|}\sum_{i \in \mathcal{T}} \mu_{\hat d_m(x_i)}(x_i)
-\]
-
-These quantities represent the best possible performance that any model selection method could achieve given the available models in a given simulation. We use these quantities as baselines.
-
-We also calculate these using the true model $\hat\tau = \tau$, which represents the best achievable performance without specifying any models a-priori:
-
-\[
-\tau MSE^{(\mathcal{T})}_{**} = 0
-\]
-
-\[
-v^{(\mathcal{T})}_{**} = \frac{1}{|\mathcal{T}|}\sum_{i \in \mathcal{T}} \mu_{ d(x_i)}(x_i)
-\]
-
-We use these minima to calculate the improvements obtained by each model selection approach relative to optimal baselines, which allows for comparison between different simulations. The relative values of $\tau MSE^{(\mathcal{T})}_{h}$ and $C^{(\mathcal{T})}_{h}$ within one test set and one set of models are
-
-\[
-	R\text{-} \tau MSE^{(\mathcal{T})}_{h} = 
-	\frac{\tau MSE^{(\mathcal{T})}_{h} - \tau MSE^{(\mathcal{T})}_{**}}{\tau MSE^{(\mathcal{T})}_{*} - \tau MSE^{(\mathcal{T})}_{**}}
-\]
-
-\[
-	R\text{-}  v^{(\mathcal{T})}_{h} = 
-	\frac{ v^{(\mathcal{T})}_{h} -  v^{(\mathcal{T})}_{**}}{ v^{(\mathcal{T})}_{*} -  v^{(\mathcal{T})}_{**}}
-\]
-
-The closer to zero these are, the better the performance of the model selection method.
-\end{comment}
+\begin{figure}
+  \centering
+    \includegraphics[width=0.6\textwidth]{experiment}
+      \caption{A visual representation of our experiments. Each row in the top grid represents one learning algorithm. Each column is one of the data-generating processes (DGPs). Each cell in that grid thus represents a fit function $\hat\tau_{m,DGP}(x)$ obtained by using that meta-learner, learning algorithm, and hyperparameter values on a training sample $\mathcal T$ from that DGP. The colored cells represent the models selected by optimizing each metric in table \ref{metric-table} using the validation set $\mathcal V$. Different colors represent different the different metrics. The models chosen via each metric in each DGP are gathered together (bottom grid) and used to estimate the individual treatment effect on a test-set $\mathcal S$ which we use to assess the true generalization error $\tau\text{-risk}^{(\mathcal S)}$ (and policy value $v^{(\mathcal S)}$) attained by using each model selection metric. The entire process is repeated and the reported results are averages across repetitions.}
+      \label{experiment-fig}
+\end{figure}
 
 \subsection{Results}
 
@@ -178,7 +149,7 @@ Random & 0.401 & 3.178 & 61.830 & 4.143 & 4.173 & 3.019 & 8.899 & 4.235 \\
 
 % latex table generated in R 3.2.2 by xtable 1.7-4 package
 % Wed May  9 15:04:17 2018
-\begin{table}[ht]
+\begin{table}[h!t]
 \centering
 \caption{$v^{(\mathcal{S})}$. True test-set value of the decision rule derived from the treatment effect model selected according to each metric (rows) in each simulation (columns), averaged across replications. Simulations 9-16 use the same data-generating functions as 1-8, but with nonrandom treatment assignment. Larger numbers indicate better performance.}
 \begin{tabular}{lllllllll}
@@ -214,11 +185,11 @@ Random & \bfseries{-0.011} & 0.407 & 1.852 & 0.505 & 0.680 & 0.421 & 0.157 & 0.5
 
 \begin{figure}
   \centering
-    \includegraphics[width=\textwidth]{detailed_results_sim16}
-      \caption{Validation-set and test-set metrics for all treatment effect models, averaged over all replications of simulation 16 (equivalent plots for other simulations show the same patterns). Each point is a single model resulting from a unique combination of meta-learner (S, T, or R), learning algorithm, and hyperparameters. The x-axis facets are the values of $\tau\text{-risk}^{(\mathcal{S})}$ and $-v^{(\mathcal{S})}$ for each model (lower values indicating higher performance). The y-axis facets are the model selection metrics for each model as estimated on the validation set (lower values indicating higher predicted performance). High correlation between a validation-set and test-set metric indicates good performance of the model selection metric.}
+    \includegraphics[width=0.9\textwidth]{detailed_results_sim16}
+      \caption{Validation-set and test-set metrics for all treatment effect models, averaged over all replications of simulation 16 (equivalent plots for other simulations show similar patterns). Each point is a single model resulting from a unique combination of meta-learner (S, T, or R), learning algorithm, and hyperparameters. The x-axis facets are the values of $\tau\text{-risk}^{(\mathcal{S})}$ and $-v^{(\mathcal{S})}$ for each model (lower values indicating higher performance). The y-axis facets are the model selection metrics for each model as estimated on the validation set (lower values indicating higher predicted performance). High correlation between a validation-set and test-set metric indicates good performance of the model selection metric.}
       \label{details16}
 \end{figure}
 
-The results in tables \ref{tmse-table} and \ref{value-table} show that $\widehat{\tau\text{-risk}}_{R}$ is the metric that most consistently selects models with low $\tau\text{-risk}$ and high value. This is especially true when treatment assignment is randomized, but also to a large extent when the assignment is biased. In the simulations where other model selection approaches win out, it is typically by a small margin. Both $\widehat{\mu\text{-risk}}$ and $\widehat{\mu\text{-risk}}_{IPTW}$ perform well (the two are identical in randomized settings). Even when the goal is to optimize value, selecting on the basis of these metrics leads to better performance than using $\hat v_{IPTW}$ or $\hat v_{DR}$. Figure \ref{details16} shows the results from simulation 16 in greater detail.
+The results in tables \ref{tmse-table} and \ref{value-table} show that $\widehat{\tau\text{-risk}}_{R}$ is the metric that most consistently selects models with low $\tau\text{-risk}$ and high value. This is especially true when treatment assignment is randomized, but also to a large extent when the assignment is biased. In the simulations where other model selection approaches win out, it is typically by a small margin. Both $\widehat{\mu\text{-risk}}$ and $\widehat{\mu\text{-risk}}_{IPTW}$ perform well (the two are identical in randomized settings). Even when the goal is to optimize value, selecting on the basis of these metrics leads to better performance than using $\hat v_{IPTW}$ or $\hat v_{DR}$. Scenarios 1 and 9 have zero treatment effect for all individuals, which is why columns 1 and 9 in table \ref{value-table} are identical: all policies will lead to the same outcomes for all patients. Figure \ref{details16} shows the results from simulation 16 in greater detail.
 
 

@@ -73,8 +73,8 @@ learners_pred_test = function(training_index, x, y, model_specs, weights=NULL) {
 
 		trained$pred %>%
 		tidyr::unite(model, names(settings$tune_grid), sep="~") %>%
-		dplyr::mutate(model = str_c(method, model, sep="@")) %>%
-		dplyr::select(y_hat=pred, index=rowIndex, model)
+		dplyr::mutate(model = str_c(method, model, sep="@")) #%>%
+		# dplyr::select(y_hat=pred, index=rowIndex, model)
 	}) %>% bind_rows()
 }
 

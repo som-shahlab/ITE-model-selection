@@ -22,7 +22,7 @@ There are many simple examples where minimizing the mean-squared error of predic
  
 For individuals in the validation set who were treated ($w=1$), we estimate their outcome using the treated model and assess error, and vice-versa for the untreated. This is equivalent to estimating the predictive risk separately for $\hat\mu_1$ and $\hat\mu_0$. 
 
-If treatment assignment is nonrandom, we can appropriately weight each residual with the estimated inverse propensity of observing an individual $x_i$ with treatment $w_i$
+If treatment assignment is random conditional on observed covariates, we can appropriately weight each residual with the estimated inverse propensity of observing an individual $x_i$ with treatment $w_i$ as suggested by \citet{VanderLaan:2003ir}
 
 \begin{equation}
 	\widehat{\mu\text{-risk}}_{IPTW} = \frac{1}{|\mathcal{V}|} \sum_{i \in \mathcal{V}}^{|\mathcal{V}|}  
@@ -128,7 +128,7 @@ where $\check\mu_{w_i}(x_i)$ and $\check p(x_i)$ can be estimated with standard 
 
 \subsection{$\tau$-risk}
 
-We have already seen that $\frac{1}{|\mathcal{V}|}\sum_{i \in \mathcal{V}}^{|\mathcal{V}|}  (\hat \tau_m (x_i)- \tau(x_i))^2$ is infeasible. A natural workaround is to replace $\tau(x_i)$ with an estimate derived from the validation set:
+We have already seen that $\frac{1}{|\mathcal{V}|}\sum_{i \in \mathcal{V}}^{|\mathcal{V}|}  (\hat \tau_m (x_i)- \tau(x_i))^2$ is infeasible because $\tau(x_i)$ is never observed directly. A natural workaround is to replace $\tau(x_i)$ with an estimate derived from the validation set:
 
 \[
 \frac{1}{|\mathcal{V}|}\sum_{i \in \mathcal{V}}^{|\mathcal{V}|}  (\hat \tau (x_i) -  \check \tau_i)^2
