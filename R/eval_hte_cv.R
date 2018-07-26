@@ -101,7 +101,7 @@ calc_test_metrics = function(data, estimates, itest) {
     c(..., mu0_test, mu1_test, tau_test)
     
     estimates %>% 
-        filter(min(itest)<=index) %>%
+        filter(min(itest)<=index) %>% # index here should be a column inside of estimates
         group_by(model) %>%
         summarize(
             tmse = mse(tau_test, tau_hat),
