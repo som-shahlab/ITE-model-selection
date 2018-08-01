@@ -29,7 +29,7 @@ bundle_wmse = function(bundle, y_hat, tau_hat) bundle %$% wmse(y, iptw, y_hat)
 ####################################################
 
 #' @export
-dr_mse = function(w, y, p,  mu0, mu1, tau_hat) sum(((y - (w-p)*tau_hat)/(p*(1-p)))^2)
+dr_mse = function(w, y, p,  mu0, mu1, tau_hat) mean(((y - (w-p)*tau_hat)/(p*(1-p)))^2)
 #' @export
 bundle_dr_mse = function(bundle, y_hat, tau_hat) bundle %$% dr_mse(w, y, p,  mu0, mu1, tau_hat)
 
