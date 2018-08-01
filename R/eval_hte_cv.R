@@ -93,6 +93,7 @@ estimate_val_metrics = function(estimates, val_bundle, metrics, ival) {
     }) %>% reduce(inner_join, by="model")
 }
 
+#' @export
 estimate_learner_test = function(data, learners, model_specs, itrain, ival, itest)
     learners %>%
     imap(function(learner, learner_name) {
