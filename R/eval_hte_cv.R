@@ -94,16 +94,17 @@ estimate_val_metrics = function(estimates, val_bundle, metrics, ival) {
 }
 
 #' @export
-estimate_learner_test = function(data, learners, model_specs, itrain, ival, itest)
+estimate_learner_test = function(data, learners, model_specs, itrain, ival, itest) {
     learners %>%
     imap(function(learner, learner_name) {
         data %>% 
             subset_rows(c(itrain, ival)) %->%
-            c(xtrain, wtrain, ytrain) 
+            c(xtrain, wtrain, ytrain, ...) 
         tau_hat = learner(xtrain, wtrain, ytrain, model_specs) %>%
             predict(data$x[itest,])
         data.frame(tau_hat=tau_hat, index=itest, model=learner_name, yhat=NA)
-    })
+    }) %>% bind_rows()
+}
 
 # apply tMSE and value to test-set estimates from all models
 #' @export
