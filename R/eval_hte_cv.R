@@ -8,7 +8,7 @@
 make_indices = function(n_train, n_val, n_test) {
     itrain = 1:n_train
     ival = (n_train+1):(n_train+n_val)
-    itest = (n_train+n_val+n_train+1):(n_train+n_val+n_train)
+    itest = (n_train+n_val+1):(n_train+n_val+n_test)
     list(itrain, ival, itest)
 }
 
