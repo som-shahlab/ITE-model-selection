@@ -7,9 +7,22 @@
 #' @export
 make_indices = function(n_train, n_val, n_test) {
     itrain = 1:n_train
-    ival = itrain + n_train
-    itest = ival + n_val
+    ival = (n_train+1):(n_train+n_val)
+    itest = (n_train+n_val+n_train+1):(n_train+n_val+n_train)
     list(itrain, ival, itest)
+}
+
+#' @export
+cv_indices = function(itrain, ival, n_folds) {
+    train_total = c(itrain, ival)
+    n_train = length(train_total)
+    splits = sample(train_total) %>%
+        split(rep(1:n_folds, ceiling(n_train/n_folds)))
+    icv = 1:n_folds %>% map(function(fold){
+        list(
+            train = splits[-fold] %>% unlist(use.names=F),
+            val = splits[[fold]])
+    })
 }
 
 # returns the index of the observation most similar to the observation in that position:
@@ -84,8 +97,8 @@ learn_validation_auxiliaries = function(data, ival, model_specs, randomized=F) {
 # use those auxiliary data and estimates on the validation set to estimate all validation metrics
 #' @export
 estimate_val_metrics = function(estimates, val_bundle, metrics, ival) {
-    val_estimates_grp = estimates %>% 
-        filter(index<=max(ival)) %>%
+    val_estimates_grp = estimates %>% # estimates on test and validation sets
+        filter(index %in% ival) %>%
         group_by(model)
     metrics %>% imap(function(metric, metric_name) {
         val_estimates_grp %>% 
@@ -114,7 +127,7 @@ calc_test_metrics = function(data, estimates, itest) {
     c(..., mu0_test, mu1_test, tau_test)
     
     estimates %>% 
-        filter(min(itest)<=index) %>% # index here should be a column inside of estimates
+        filter(index %in% itest) %>% # index here should be a column inside of estimates
         group_by(model) %>%
         summarize(
             tmse = mse(tau_test, tau_hat),
