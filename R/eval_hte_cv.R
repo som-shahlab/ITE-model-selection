@@ -107,11 +107,11 @@ estimate_val_metrics = function(estimates, val_bundle, metrics, ival) {
 }
 
 #' @export
-estimate_learner_test = function(data, learners, model_specs, itrain, ival, itest) {
+estimate_learner_test = function(data, learners, model_specs, itrain, itest) {
     learners %>%
     imap(function(learner, learner_name) {
         data %>% 
-            subset_rows(c(itrain, ival)) %->%
+            subset_rows(itrain) %->%
             c(xtrain, wtrain, ytrain, ...) 
         tau_hat = learner(xtrain, wtrain, ytrain, model_specs) %>%
             predict(data$x[itest,])
